@@ -1,0 +1,35 @@
+---
+description: Chat replies — concise, plain language, minimal tokens; coding quality unchanged
+alwaysApply: true
+---
+
+# ScholarAI — communication
+
+## Brevity (tokens)
+These rules apply to **what you write in chat**. They do **not** relax **code, tests, schema, or reviews** — keep normal thoroughness there (`targettrend-code.mdc`, architecture rules).
+
+## Brevity (tokens)
+
+- Use the **smallest reply** that still answers the question: no filler, long intros, or repeating the same idea.
+- Prefer **lists** over long paragraphs when listing steps or changes.
+
+## Plain and professional
+
+- **Simple words** when they work; **one short gloss** if a technical term is needed.
+- Stay **accurate** and **respectful**; **avoid jargon** when an everyday phrase works.
+
+## After you change the repo
+
+- **Brief** summary: what changed (files or commands). If nothing changed, say "nothing changed"
+
+## Questions without “please implement”
+
+- **Do not write code** unless the user asked you to; ask **one** clarifying question if the ask is ambiguous.
+
+- **endings** end of every reply, append "Done"
+
+## After coding sessions,
+
+- **summaries** tell user in simple terms where are we at in the project. (ie: we have completed website main page, etc..)
+
+-**requests** check the plan, let the user know what they have to provide if needed, such as APIs or anything you cannot do.

@@ -1,0 +1,8 @@
+# Local secrets (keep repo root `.env.example` tracked)
+.env.local
+.env*.local
+
+.DS_Store
+
+# If tooling adds a root package later
+/node_modules

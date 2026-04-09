@@ -1,0 +1,38 @@
+---
+description: ScholarAI project context — read agent docs first, scope and doc sync
+alwaysApply: true
+---
+
+# ScholarAI — project context
+
+## Doc index (read before substantive work)
+
+Follow the order in **[`docs/agent/README.md`](docs/agent/README.md)**:
+
+1. `docs/agent/projectsummary.md` — product intent  
+2. `docs/agent/pa.md` — architecture  
+3. `docs/agent/plan.md` — phases and v1 definition of done  
+4. `docs/agent/human-notes.md` — run/test/migrate  
+5. `docs/agent/issuesnotes.md` — tooling gotchas (append-only, newest first)  
+6. `docs/agent/data-sources.md` — APIs and env names  
+7. `docs/data-model.md` — Paper and related shapes  
+
+Human source of truth: **`docs/project summary.md`**. If agent docs conflict, align with that file.
+
+## Scope discipline
+
+- Implement work that matches **open phases** in `plan.md`; do not build Phase 3+ AI features before search/filters are in place unless the plan explicitly allows a spike branch.
+- When behavior, boundaries, or persistence change, update **`pa.md` and `plan.md` together**.
+- Tooling/install/CI fixes: add a short **dated** entry to `issuesnotes.md` (no secrets).
+
+## Non-negotiables
+
+- **No secrets in git** — only `.env.example` at repo root for variable *names*; real values in `.env.local` or secret managers.
+- **API keys server-side** — do not expose Semantic Scholar or LLM keys to the browser.
+- **Observability** — prefer structured logs for external calls (latency, errors); never log secrets or full env.
+
+## Access, cost, and external services
+
+- **Tell the user** before any work that needs **network access to paid or metered services**, **new account sign-up**, **API keys beyond what is already in `.env.example`**, or **actions that could incur charges** (cloud hosts, commercial data, LLM APIs, high-volume scraping, etc.).
+- **Default to the safest choice:** prefer local/offline steps, stubs, dry runs, documentation-only changes, or small test calls over bulk jobs. Do not enable billing, upgrade tiers, or purchase services on the user’s behalf.
+- **Rate limits and terms:** When integrating or calling external APIs, stay within documented limits and terms; avoid aggressive polling or large backfills without explicit user approval and a clear plan.

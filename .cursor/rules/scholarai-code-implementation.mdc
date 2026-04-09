@@ -1,0 +1,31 @@
+---
+description: ScholarAI code — contracts, tests, APIs, logging
+globs: "**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.py"
+alwaysApply: false
+---
+
+# ScholarAI — code and implementation
+
+## Contracts
+
+- Use the **Paper** and related shapes in **`docs/data-model.md`** for UI, search adapter, and LLM payloads; map Semantic Scholar fields in one place.
+- Search and AI routes should return **stable JSON** shapes; document breaking changes in `pa.md` / `plan.md`.
+
+## External APIs
+
+- Obey **Semantic Scholar** and LLM provider **terms and rate limits** (`docs/agent/data-sources.md`). No bulk scraping; cache where allowed.
+- Timeouts and retries: bounded; surface user-visible errors without leaking stack traces in production.
+
+## Tests
+
+- Add or update tests when changing search parsing, filters/sort, or LLM response parsing (fixture-based tests encouraged for HTTP).
+- UI: smoke or component tests optional early; prioritize adapter and ranking/synthesis parsers.
+
+## Logging (jobs and server work)
+
+- Log operation name, duration, and outcome class (success / 4xx / 5xx). Omit API keys and full prompts if they may contain sensitive content.
+
+## Security
+
+- Validate and sanitize **LLM JSON** before using for sort order or rendering.
+- If fetching remote URLs (e.g. PDFs later), guard against **SSRF**; allowlist or server-only fetches.
