@@ -1,4 +1,5 @@
 import type { SearchApiError } from "@/lib/paper";
+import type { SearchResultFilters } from "@/lib/result-filters";
 
 /** Payload item sent to the LLM (trimmed server-side). */
 export type AiPaperInput = {
@@ -37,6 +38,15 @@ export type AiChatResponse = {
   reply: string;
   citations: string[];
   outOfCorpus: boolean;
+  provider?: "deepseek" | "gemini";
+  error?: SearchApiError;
+};
+
+/** `POST /api/ai/search-plan` — Phase 5 AI-guided search. */
+export type AiSearchPlanResponse = {
+  queries: string[];
+  filtersPatch: Partial<SearchResultFilters>;
+  rationale?: string;
   provider?: "deepseek" | "gemini";
   error?: SearchApiError;
 };

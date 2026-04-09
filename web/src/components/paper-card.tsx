@@ -15,10 +15,15 @@ function authorSnippet(authors: Paper["authors"], max = 3): string {
 
 export function PaperCard({
   paper,
-  aiMeta,
+  selection,
 }: {
   paper: Paper;
-  aiMeta?: { score: number; note?: string };
+  /** Optional checklist row for Phase 5 chat corpus selection. */
+  selection?: {
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    disabled?: boolean;
+  };
 }) {
   const [expanded, setExpanded] = useState(false);
   const abs = paper.abstract;
@@ -36,17 +41,21 @@ export function PaperCard({
   return (
     <article className="rounded-xl border border-zinc-200/90 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/40">
       <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1">
+        {selection && (
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 pt-0.5">
+            <input
+              type="checkbox"
+              checked={selection.checked}
+              disabled={selection.disabled}
+              onChange={(e) => selection.onChange(e.target.checked)}
+              className="size-4 rounded border-zinc-300 text-emerald-700 focus:ring-emerald-600 dark:border-zinc-600 dark:text-emerald-500"
+            />
+            <span className="sr-only">Include in research chat corpus</span>
+          </label>
+        )}
         <h2 className="min-w-0 flex-1 text-base font-semibold leading-snug text-zinc-900 dark:text-zinc-50">
           {paper.title}
         </h2>
-        {aiMeta != null && (
-          <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-900 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-100"
-            title={aiMeta.note ?? "Relevance score from AI mode (0–100)"}
-          >
-            AI {Math.round(aiMeta.score)}
-          </span>
-        )}
         {paper.url ? (
           <a
             href={paper.url}

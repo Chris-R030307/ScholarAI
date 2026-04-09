@@ -1,7 +1,14 @@
 "use client";
 
 import { Loader2, MessageCircle } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AiSynthesis } from "@/components/ai-synthesis";
 import type { ChatTurn } from "@/lib/ai/normalize-chat-request";
 import type { AiChatResponse } from "@/lib/ai/types";
@@ -20,12 +27,19 @@ function toApiMessages(msgs: LocalMsg[]): ChatTurn[] {
 }
 
 type Props = {
-  papers: Paper[];
+  /** `null` = user has not submitted a corpus yet (Phase 5). */
+  corpusPapers: Paper[] | null;
   corpusSignature: string;
   disabled?: boolean;
 };
 
-export function ResearchChat({ papers, corpusSignature, disabled }: Props) {
+export function ResearchChat({
+  corpusPapers,
+  corpusSignature,
+  disabled,
+}: Props) {
+  const awaitingCorpus = corpusPapers === null;
+  const papers = useMemo(() => corpusPapers ?? [], [corpusPapers]);
   const [messages, setMessages] = useState<LocalMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -67,7 +81,14 @@ export function ResearchChat({ papers, corpusSignature, disabled }: Props) {
 
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || loading || disabled || papers.length === 0) return;
+    if (
+      !text ||
+      loading ||
+      disabled ||
+      awaitingCorpus ||
+      papers.length === 0
+    )
+      return;
     setErr(null);
     setInput("");
     const userTurn: LocalUser = { role: "user", content: text };
@@ -115,6 +136,7 @@ export function ResearchChat({ papers, corpusSignature, disabled }: Props) {
       setLoading(false);
     }
   }, [
+    awaitingCorpus,
     disabled,
     input,
     loading,
@@ -143,13 +165,24 @@ export function ResearchChat({ papers, corpusSignature, disabled }: Props) {
         )}
       </h2>
       <p className="mb-3 text-xs text-sky-900/85 dark:text-sky-200/80">
-        Answers use only the papers currently shown (after filters). Unrelated
-        questions get a scoped refusal.
+        {awaitingCorpus
+          ? "Submit a paper selection from the list to scope this chat. Answers use only those papers; unrelated questions get a scoped refusal."
+          : "Answers use only the papers you submitted for chat. Unrelated questions get a scoped refusal."}
       </p>
       <div className="mb-3 max-h-64 space-y-3 overflow-y-auto rounded-lg border border-sky-200/60 bg-white/80 px-3 py-2 dark:border-sky-900/40 dark:bg-zinc-950/40">
-        {messages.length === 0 && !loading && (
+        {awaitingCorpus && messages.length === 0 && !loading && (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Ask about methods, themes, or comparisons across these results.
+            Check one or more papers in the results list, then click{" "}
+            <strong className="font-medium text-zinc-700 dark:text-zinc-300">
+              Submit selection for chat
+            </strong>
+            .
+          </p>
+        )}
+        {!awaitingCorpus && messages.length === 0 && !loading && (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Ask about methods, themes, or comparisons across your selected
+            papers.
           </p>
         )}
         {messages.map((m, i) => (
@@ -226,13 +259,21 @@ export function ResearchChat({ papers, corpusSignature, disabled }: Props) {
           rows={2}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={disabled || loading || papers.length === 0}
+          disabled={
+            disabled || loading || awaitingCorpus || papers.length === 0
+          }
           placeholder="e.g. Which papers use qualitative methods?"
           className="resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-sky-600/20 placeholder:text-zinc-400 focus:border-sky-600/40 focus:ring-2 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
         />
         <button
           type="submit"
-          disabled={disabled || loading || papers.length === 0 || !input.trim()}
+          disabled={
+            disabled ||
+            loading ||
+            awaitingCorpus ||
+            papers.length === 0 ||
+            !input.trim()
+          }
           className="self-start rounded-lg bg-sky-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-800 disabled:opacity-60 dark:bg-sky-600 dark:hover:bg-sky-500"
         >
           Send

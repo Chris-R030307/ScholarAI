@@ -1,6 +1,6 @@
 import { AI_CHAT_RATE_LIMIT_MS, AI_RATE_LIMIT_MS } from "@/lib/ai/constants";
 
-export type AiThrottleChannel = "analyze" | "chat";
+export type AiThrottleChannel = "analyze" | "chat" | "searchPlan";
 
 const lastOk = new Map<string, number>();
 
@@ -9,7 +9,8 @@ function storageKey(clientKey: string, channel: AiThrottleChannel): string {
 }
 
 function intervalMs(channel: AiThrottleChannel): number {
-  return channel === "chat" ? AI_CHAT_RATE_LIMIT_MS : AI_RATE_LIMIT_MS;
+  if (channel === "chat") return AI_CHAT_RATE_LIMIT_MS;
+  return AI_RATE_LIMIT_MS;
 }
 
 /**

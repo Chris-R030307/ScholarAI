@@ -4,6 +4,8 @@ export type ParsedChatReply = {
   outOfCorpus: boolean;
 };
 
+import { parseLlmJsonObject } from "@/lib/ai/parse-llm-json";
+
 export type ParseChatResult =
   | { ok: true; value: ParsedChatReply }
   | { ok: false; message: string };
@@ -12,10 +14,8 @@ export function parseChatJson(
   raw: string,
   validPaperIds: Set<string>,
 ): ParseChatResult {
-  let data: unknown;
-  try {
-    data = JSON.parse(raw) as unknown;
-  } catch {
+  const data = parseLlmJsonObject(raw);
+  if (data === null) {
     return { ok: false, message: "Model returned invalid JSON." };
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) {

@@ -6,15 +6,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
-import { AiSynthesis } from "@/components/ai-synthesis";
+import { ResizableSplit } from "@/components/resizable-split";
 import { ResearchChat } from "@/components/research-chat";
 import { SearchFiltersPanel } from "@/components/search-filters-panel";
 import { PaperCard } from "@/components/paper-card";
-import type { AiAnalyzeResponse } from "@/lib/ai/types";
-import { sortDisplayedByAiScores } from "@/lib/ai/sort-displayed";
+import type { AiSearchPlanResponse } from "@/lib/ai/types";
 import type { Paper, SearchApiResponse } from "@/lib/paper";
 import {
   applyFiltersAndSort,
@@ -23,11 +21,6 @@ import {
 } from "@/lib/result-filters";
 
 const PAGE_LIMIT = 20;
-
-/** Stable AI cache key: goal + top corpus ids (order-insensitive). */
-function aiSignatureFrom(researchGoal: string, paperIds: string[]): string {
-  return `${researchGoal.trim()}::${[...paperIds].sort().join(",")}`;
-}
 
 function inferHasMore(params: {
   batchLen: number;
@@ -60,6 +53,7 @@ export function SearchSection() {
   const [accumulated, setAccumulated] = useState<Paper[]>([]);
   const [nextOffset, setNextOffset] = useState(0);
   const [total, setTotal] = useState<number | undefined>();
+  const [paginationQuery, setPaginationQuery] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,144 +63,34 @@ export function SearchSection() {
   );
   const [completedQuery, setCompletedQuery] = useState<string | null>(null);
   const [moreAvailable, setMoreAvailable] = useState(false);
-  const [aiMode, setAiMode] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiErr, setAiErr] = useState<{ message: string; code?: string } | null>(
-    null,
-  );
-  const [aiOk, setAiOk] = useState<{
-    signature: string;
-    rankingById: Map<string, { score: number; note?: string }>;
-    analyzedIds: Set<string>;
-    synthesis: string;
-    provider?: string;
-  } | null>(null);
+  const [aiSearchMode, setAiSearchMode] = useState(false);
+  const [planRationale, setPlanRationale] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
+  const [submittedCorpus, setSubmittedCorpus] = useState<Paper[] | null>(null);
 
   const displayed = useMemo(
     () => applyFiltersAndSort(accumulated, filters),
     [accumulated, filters],
   );
 
-  const researchGoal = useMemo(() => {
-    const q = (completedQuery ?? trimmedQuery).trim();
-    return q || "Academic search results";
-  }, [completedQuery, trimmedQuery]);
-
-  const top20ForAi = useMemo(() => displayed.slice(0, PAGE_LIMIT), [displayed]);
-
-  const currentAiSignature = useMemo(
-    () => aiSignatureFrom(researchGoal, top20ForAi.map((p) => p.id)),
-    [researchGoal, top20ForAi],
-  );
-
-  const chatCorpusSignature = useMemo(
-    () => [...displayed].map((p) => p.id).sort().join(","),
-    [displayed],
-  );
-
-  const displayedRef = useRef(displayed);
-  displayedRef.current = displayed;
-
-  const visiblePapers = useMemo(() => {
-    if (
-      !aiMode ||
-      aiLoading ||
-      !aiOk ||
-      aiOk.signature !== currentAiSignature
-    ) {
-      return displayed;
-    }
-    return sortDisplayedByAiScores(
-      displayed,
-      aiOk.rankingById,
-      aiOk.analyzedIds,
-    );
-  }, [
-    aiMode,
-    aiLoading,
-    aiOk,
-    currentAiSignature,
-    displayed,
-  ]);
-
   useEffect(() => {
-    if (displayed.length === 0) setAiMode(false);
-  }, [displayed.length]);
-
-  useEffect(() => {
-    if (!aiMode) {
-      setAiLoading(false);
-      setAiErr(null);
-      setAiOk(null);
-      return;
-    }
-    const papers = displayedRef.current.slice(0, PAGE_LIMIT);
-    if (papers.length === 0) return;
-
-    const sig = currentAiSignature;
-    const ac = new AbortController();
-    setAiLoading(true);
-    setAiErr(null);
-
-    void (async () => {
-      try {
-        const res = await fetch("/api/ai/analyze", {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          signal: ac.signal,
-          body: JSON.stringify({
-            researchGoal,
-            papers: papers.map((p) => ({
-              id: p.id,
-              title: p.title,
-              abstract: p.abstract,
-            })),
-          }),
-        });
-        const data = (await res.json()) as AiAnalyzeResponse;
-        if (ac.signal.aborted) return;
-        if (data.error) {
-          setAiOk(null);
-          setAiErr({
-            message: data.error.message,
-            code: data.error.code,
-          });
-          return;
+    const ids = new Set(displayed.map((p) => p.id));
+    setCheckedIds((prev) => {
+      const next = new Set([...prev].filter((id) => ids.has(id)));
+      if (next.size === prev.size) {
+        for (const id of prev) {
+          if (!next.has(id)) return next;
         }
-        const rankingById = new Map(
-          data.rankings.map((r) => [
-            r.paperId,
-            { score: r.score, note: r.note },
-          ]),
-        );
-        const analyzedIds = new Set(papers.map((p) => p.id));
-        setAiOk({
-          signature: sig,
-          rankingById,
-          analyzedIds,
-          synthesis: data.synthesis,
-          provider: data.provider,
-        });
-        setAiErr(null);
-      } catch (e) {
-        if (ac.signal.aborted) return;
-        setAiOk(null);
-        setAiErr({
-          message:
-            e instanceof Error
-              ? e.message
-              : "Could not run AI analysis. Try again.",
-        });
-      } finally {
-        if (!ac.signal.aborted) setAiLoading(false);
+        return prev;
       }
-    })();
+      return next;
+    });
+  }, [displayed]);
 
-    return () => ac.abort();
-  }, [aiMode, currentAiSignature, researchGoal]);
+  const chatCorpusSignature = useMemo(() => {
+    if (submittedCorpus === null) return "unsubmitted";
+    return [...submittedCorpus].map((p) => p.id).sort().join(",");
+  }, [submittedCorpus]);
 
   const hasResults = accumulated.length > 0;
   const canLoadMore =
@@ -236,10 +120,96 @@ export function SearchSection() {
       setAccumulated([]);
       setNextOffset(0);
       setTotal(undefined);
+      setPaginationQuery(null);
+      setPlanRationale(null);
+      setCheckedIds(new Set());
+      setSubmittedCorpus(null);
       return;
     }
     setLoading(true);
     try {
+      if (aiSearchMode) {
+        const planRes = await fetch("/api/ai/search-plan", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ intent: q }),
+        });
+        const plan = (await planRes.json()) as AiSearchPlanResponse;
+        if (plan.error) {
+          setCompletedQuery(q);
+          setMoreAvailable(false);
+          setAccumulated([]);
+          setNextOffset(0);
+          setTotal(undefined);
+          setPaginationQuery(null);
+          setPlanRationale(null);
+          setError(plan.error.message);
+          setErrorCode(plan.error.code ?? null);
+          return;
+        }
+
+        setFilters((f) => ({ ...f, ...plan.filtersPatch }));
+        const queries = plan.queries;
+        const primary = queries[0];
+        setPaginationQuery(primary);
+
+        let acc: Paper[] = [];
+        let primaryLen = 0;
+        let primaryTotal: number | undefined;
+
+        for (let i = 0; i < queries.length; i++) {
+          const { res, data } = await fetchPage(queries[i], 0);
+          if (!res.ok && data.error) {
+            setCompletedQuery(q);
+            setMoreAvailable(false);
+            setAccumulated([]);
+            setNextOffset(0);
+            setTotal(undefined);
+            setError(data.error.message);
+            setErrorCode(data.error.code ?? null);
+            setPlanRationale(null);
+            return;
+          }
+          if (data.error) {
+            setCompletedQuery(q);
+            setMoreAvailable(false);
+            setAccumulated([]);
+            setNextOffset(0);
+            setTotal(undefined);
+            setError(data.error.message);
+            setErrorCode(data.error.code ?? null);
+            setPlanRationale(null);
+            return;
+          }
+          if (i === 0) {
+            primaryLen = data.papers.length;
+            primaryTotal = data.total;
+          }
+          acc = mergeDedupe(acc, data.papers);
+        }
+
+        setCompletedQuery(q);
+        setAccumulated(acc);
+        setNextOffset(primaryLen);
+        setTotal(primaryTotal);
+        setMoreAvailable(
+          inferHasMore({
+            batchLen: primaryLen,
+            limit: PAGE_LIMIT,
+            prevOffset: 0,
+            total: primaryTotal,
+          }),
+        );
+        setPlanRationale(plan.rationale ?? null);
+        setCheckedIds(new Set());
+        setSubmittedCorpus(null);
+        return;
+      }
+
+      setPlanRationale(null);
       const { res, data } = await fetchPage(q, 0);
       if (!res.ok && data.error) {
         setCompletedQuery(q);
@@ -247,6 +217,7 @@ export function SearchSection() {
         setAccumulated([]);
         setNextOffset(0);
         setTotal(undefined);
+        setPaginationQuery(null);
         setError(data.error.message);
         setErrorCode(data.error.code ?? null);
         return;
@@ -257,6 +228,7 @@ export function SearchSection() {
         setAccumulated([]);
         setNextOffset(0);
         setTotal(undefined);
+        setPaginationQuery(null);
         setError(data.error.message);
         setErrorCode(data.error.code ?? null);
         return;
@@ -265,6 +237,7 @@ export function SearchSection() {
       setAccumulated(mergeDedupe([], data.papers));
       setNextOffset(data.papers.length);
       setTotal(data.total);
+      setPaginationQuery(q);
       setMoreAvailable(
         inferHasMore({
           batchLen: data.papers.length,
@@ -273,26 +246,31 @@ export function SearchSection() {
           total: data.total,
         }),
       );
+      setCheckedIds(new Set());
+      setSubmittedCorpus(null);
     } catch {
       setCompletedQuery(q);
       setMoreAvailable(false);
       setAccumulated([]);
       setNextOffset(0);
       setTotal(undefined);
+      setPaginationQuery(null);
+      setPlanRationale(null);
       setErrorCode(null);
       setError("Something went wrong. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [fetchPage, trimmedQuery]);
+  }, [aiSearchMode, fetchPage, trimmedQuery]);
 
   const loadMore = useCallback(async () => {
-    if (!trimmedQuery || loadingMore || !canLoadMore) return;
+    const q = paginationQuery ?? trimmedQuery;
+    if (!q || loadingMore || !canLoadMore) return;
     setLoadingMore(true);
     setError(null);
     setErrorCode(null);
     try {
-      const { res, data } = await fetchPage(trimmedQuery, nextOffset);
+      const { res, data } = await fetchPage(q, nextOffset);
       if (!res.ok && data.error) {
         setError(data.error.message);
         setErrorCode(data.error.code ?? null);
@@ -321,11 +299,27 @@ export function SearchSection() {
     } finally {
       setLoadingMore(false);
     }
-  }, [canLoadMore, fetchPage, loadingMore, nextOffset, total, trimmedQuery]);
+  }, [canLoadMore, fetchPage, loadingMore, nextOffset, paginationQuery, total, trimmedQuery]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     void runSearch();
+  }
+
+  function toggleChecked(id: string, on: boolean) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function submitChatCorpus() {
+    const picked = displayed.filter((p) => checkedIds.has(p.id));
+    if (picked.length === 0) return;
+    setSubmittedCorpus(picked);
+    setCheckedIds(new Set());
   }
 
   const noSearchHits =
@@ -340,10 +334,39 @@ export function SearchSection() {
     hasResults &&
     displayed.length === 0;
 
-  return (
-    <div className="flex w-full max-w-6xl flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
-      <div className="flex min-w-0 flex-1 flex-col gap-8">
-        <form onSubmit={onSubmit} className="relative w-full max-w-2xl">
+  const checkedCount = checkedIds.size;
+
+  const leftColumn = (
+    <div className="flex min-h-0 min-w-0 flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAiSearchMode((v) => !v)}
+            className={
+              aiSearchMode
+                ? "inline-flex items-center gap-1.5 rounded-full border border-violet-500 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-950 shadow-sm dark:border-violet-500/70 dark:bg-violet-950/45 dark:text-violet-100"
+                : "inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            }
+          >
+            <Sparkles className="size-3.5 shrink-0" aria-hidden />
+            AI search
+          </button>
+          {aiSearchMode && (
+            <span className="text-xs text-violet-900/90 dark:text-violet-200/90">
+              Vague questions → Scholar-style queries and optional filters.
+            </span>
+          )}
+        </div>
+
+        <form
+          onSubmit={onSubmit}
+          className={
+            aiSearchMode
+              ? "relative w-full max-w-2xl rounded-xl ring-2 ring-violet-400/55 dark:ring-violet-600/45"
+              : "relative w-full max-w-2xl"
+          }
+        >
           <label htmlFor="paper-search" className="sr-only">
             Search papers
           </label>
@@ -357,7 +380,11 @@ export function SearchSection() {
             name="query"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. diffusion models for text…"
+            placeholder={
+              aiSearchMode
+                ? "e.g. papers about how habits form in the brain…"
+                : "e.g. diffusion models for text…"
+            }
             autoComplete="off"
             className="w-full rounded-lg border border-zinc-200 bg-white py-3 pl-11 pr-24 text-sm text-zinc-900 shadow-sm outline-none ring-emerald-600/20 placeholder:text-zinc-400 focus:border-emerald-600/40 focus:ring-2 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
@@ -376,229 +403,225 @@ export function SearchSection() {
             )}
           </button>
         </form>
-
-        {error && (
-          <div
-            role="alert"
-            className="flex max-w-2xl gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            <div className="min-w-0 space-y-2">
-              <p>{error}</p>
-              {errorCode === "RATE_LIMIT" && (
-                <p className="border-t border-red-200/80 pt-2 text-red-800/95 dark:border-red-800/60 dark:text-red-100/90">
-                  <strong className="font-medium">Local fix:</strong> request a
-                  free key from{" "}
-                  <a
-                    href="https://www.semanticscholar.org/product/api"
-                    className="font-medium underline decoration-red-400 underline-offset-2 hover:decoration-red-600"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Semantic Scholar
-                  </a>
-                  , put{" "}
-                  <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
-                    SEMANTIC_SCHOLAR_API_KEY
-                  </code>{" "}
-                  in{" "}
-                  <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
-                    web/.env.local
-                  </code>
-                  , then restart{" "}
-                  <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
-                    npm run dev
-                  </code>
-                  .
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {noSearchHits && (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No papers found for that query.
-          </p>
-        )}
-
-        {filteredEmpty && (
-          <p className="text-sm text-amber-800 dark:text-amber-200/90">
-            No papers match your filters. Try widening the year range, lowering
-            minimum citations, or setting venue type to Any.
-          </p>
-        )}
-
-        {!loading && trimmedQuery === "" && (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Enter a topic or paper title to search Semantic Scholar.
-          </p>
-        )}
-
-        {hasResults && (
-          <div className="flex w-full flex-col gap-4">
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">
-              <p>
-                Showing{" "}
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                  {displayed.length}
-                </span>
-                {displayed.length !== accumulated.length ? (
-                  <>
-                    {" "}
-                    matches
-                    <span className="text-zinc-400 dark:text-zinc-500">
-                      {" "}
-                      ({accumulated.length} loaded
-                      {total != null
-                        ? ` of ${total.toLocaleString()} total`
-                        : ""}
-                      )
-                    </span>
-                  </>
-                ) : total != null ? (
-                  <>
-                    {" "}
-                    of {total.toLocaleString()} from search
-                  </>
-                ) : (
-                  " papers"
-                )}
-              </p>
-            </div>
-            {aiMode && (
-              <section
-                aria-label="AI synthesis"
-                className="rounded-xl border border-violet-200/90 bg-violet-50/60 p-4 dark:border-violet-900/55 dark:bg-violet-950/25"
-              >
-                <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-medium text-violet-950 dark:text-violet-100">
-                  <Sparkles className="size-4 shrink-0" aria-hidden />
-                  <span>Synthesis (top corpus)</span>
-                  {aiOk?.signature === currentAiSignature && aiOk.provider && (
-                    <span className="text-xs font-normal text-violet-800/80 dark:text-violet-200/80">
-                      via {aiOk.provider}
-                    </span>
-                  )}
-                </div>
-                {aiLoading && (
-                  <p className="flex items-center gap-2 text-sm text-violet-900/90 dark:text-violet-100/90">
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                    Analyzing up to 20 visible results…
-                  </p>
-                )}
-                {aiErr && !aiLoading && (
-                  <div
-                    role="alert"
-                    className="rounded-lg border border-red-200 bg-red-50/90 px-3 py-2 text-sm text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-100"
-                  >
-                    {aiErr.message}
-                    {aiErr.code === "NO_PROVIDER" && (
-                      <p className="mt-2 border-t border-red-200/80 pt-2 text-red-800/95 dark:border-red-800/50 dark:text-red-100/90">
-                        Add{" "}
-                        <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
-                          DEEPSEEK_API_KEY
-                        </code>{" "}
-                        or{" "}
-                        <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
-                          GEMINI_API_KEY
-                        </code>{" "}
-                        to{" "}
-                        <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
-                          web/.env.local
-                        </code>{" "}
-                        and restart the dev server.
-                      </p>
-                    )}
-                  </div>
-                )}
-                {!aiLoading &&
-                  aiOk?.signature === currentAiSignature &&
-                  !aiErr && (
-                    <AiSynthesis markdown={aiOk.synthesis} />
-                  )}
-              </section>
-            )}
-            <ul className="flex flex-col gap-4">
-              {visiblePapers.map((p) => (
-                <li key={p.id}>
-                  <PaperCard
-                    paper={p}
-                    aiMeta={
-                      aiMode &&
-                      aiOk?.signature === currentAiSignature &&
-                      aiOk.analyzedIds.has(p.id)
-                        ? aiOk.rankingById.get(p.id)
-                        : undefined
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-            {canLoadMore && (
-              <button
-                type="button"
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-                className="self-start rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-              >
-                {loadingMore ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                    Loading…
-                  </span>
-                ) : (
-                  "Load more"
-                )}
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
+      {planRationale && aiSearchMode && completedQuery === trimmedQuery && (
+        <p
+          className="max-w-2xl rounded-lg border border-violet-200/80 bg-violet-50/50 px-3 py-2 text-sm text-violet-950 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-100"
+          role="status"
+        >
+          <span className="font-medium">Plan: </span>
+          {planRationale}
+        </p>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          className="flex max-w-2xl gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div className="min-w-0 space-y-2">
+            <p>{error}</p>
+            {errorCode === "RATE_LIMIT" && (
+              <p className="border-t border-red-200/80 pt-2 text-red-800/95 dark:border-red-800/60 dark:text-red-100/90">
+                <strong className="font-medium">Local fix:</strong> request a
+                free key from{" "}
+                <a
+                  href="https://www.semanticscholar.org/product/api"
+                  className="font-medium underline decoration-red-400 underline-offset-2 hover:decoration-red-600"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Semantic Scholar
+                </a>
+                , put{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  SEMANTIC_SCHOLAR_API_KEY
+                </code>{" "}
+                in{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  web/.env.local
+                </code>
+                , then restart{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  npm run dev
+                </code>
+                .
+              </p>
+            )}
+            {(errorCode === "NO_PROVIDER" || errorCode === "LLM_ERROR") && (
+              <p className="border-t border-red-200/80 pt-2 text-red-800/95 dark:border-red-800/50 dark:text-red-100/90">
+                For AI features, add{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  DEEPSEEK_API_KEY
+                </code>{" "}
+                or{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  GEMINI_API_KEY
+                </code>{" "}
+                to{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  web/.env.local
+                </code>{" "}
+                (repo root{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  .env.local
+                </code>{" "}
+                is ignored — use the file inside{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  web/
+                </code>
+                ), then restart the dev server. See{" "}
+                <code className="rounded bg-red-100/80 px-1 py-0.5 text-xs dark:bg-red-900/50">
+                  docs/agent/human-notes.md
+                </code>
+                .
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {noSearchHits && (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          No papers found for that query.
+        </p>
+      )}
+
+      {filteredEmpty && (
+        <p className="text-sm text-amber-800 dark:text-amber-200/90">
+          No papers match your filters. Try widening the year range, lowering
+          minimum citations, or setting venue type to Any.
+        </p>
+      )}
+
+      {!loading && trimmedQuery === "" && (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Enter a topic or paper title to search Semantic Scholar.
+        </p>
+      )}
+
       {hasResults && (
-        <aside className="flex w-full shrink-0 flex-col gap-4 lg:sticky lg:top-8 lg:w-60">
+        <div className="flex min-h-0 w-full flex-col gap-4">
           <SearchFiltersPanel
             filters={filters}
             onChange={setFilters}
             disabled={loading}
           />
-          <div
-            className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900/40"
-            aria-label="AI mode"
-          >
-            <h2 className="mb-3 flex items-center gap-2 font-medium text-zinc-900 dark:text-zinc-100">
-              <Sparkles
-                className="size-4 text-violet-600 dark:text-violet-400"
-                aria-hidden
-              />
-              AI mode
-            </h2>
-            <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={aiMode}
-                onChange={(e) => setAiMode(e.target.checked)}
-                disabled={loading || displayed.length === 0}
-                className="mt-0.5 size-4 rounded border-zinc-300 text-violet-700 focus:ring-violet-600 dark:border-zinc-600 dark:text-violet-500"
-              />
-              <span className="text-zinc-800 dark:text-zinc-200">
-                Re-rank visible results and summarize themes across the top
-                papers (uses titles/abstracts only; keys stay on the server).
-                <span className="mt-1 block text-xs font-normal text-zinc-500 dark:text-zinc-400">
-                  Tie-break: same AI score keeps filter/order baseline.
-                </span>
+
+          <div className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p>
+              Showing{" "}
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                {displayed.length}
               </span>
-            </label>
+              {displayed.length !== accumulated.length ? (
+                <>
+                  {" "}
+                  matches
+                  <span className="text-zinc-400 dark:text-zinc-500">
+                    {" "}
+                    ({accumulated.length} loaded
+                    {total != null
+                      ? ` of ${total.toLocaleString()} total`
+                      : ""}
+                    )
+                  </span>
+                </>
+              ) : total != null ? (
+                <>
+                  {" "}
+                  of {total.toLocaleString()} from search
+                </>
+              ) : (
+                " papers"
+              )}
+            </p>
           </div>
-          {displayed.length > 0 && (
-            <ResearchChat
-              papers={displayed}
-              corpusSignature={chatCorpusSignature}
-              disabled={loading}
-            />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={submitChatCorpus}
+              disabled={checkedCount === 0 || loading}
+              className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-800 disabled:opacity-50 dark:bg-sky-600 dark:hover:bg-sky-500"
+            >
+              Submit selection for chat
+            </button>
+            <span className="text-sm text-zinc-600 dark:text-zinc-400">
+              {checkedCount} selected
+              {submittedCorpus && submittedCorpus.length > 0 && (
+                <span className="text-zinc-400 dark:text-zinc-500">
+                  {" "}
+                  · {submittedCorpus.length} in chat corpus
+                </span>
+              )}
+            </span>
+          </div>
+
+          <ul className="flex min-h-0 flex-col gap-4 overflow-y-auto pb-4">
+            {displayed.map((p) => (
+              <li key={p.id}>
+                <PaperCard
+                  paper={p}
+                  selection={{
+                    checked: checkedIds.has(p.id),
+                    onChange: (on) => toggleChecked(p.id, on),
+                    disabled: loading,
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+
+          {canLoadMore && (
+            <button
+              type="button"
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+              className="self-start rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              {loadingMore ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Loading…
+                </span>
+              ) : (
+                "Load more"
+              )}
+            </button>
           )}
-        </aside>
+        </div>
       )}
     </div>
+  );
+
+  const rightColumn = (
+    <div className="flex min-h-0 flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
+      <ResearchChat
+        corpusPapers={submittedCorpus}
+        corpusSignature={chatCorpusSignature}
+        disabled={loading}
+      />
+    </div>
+  );
+
+  if (!hasResults) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col">{leftColumn}</div>
+    );
+  }
+
+  return (
+    <ResizableSplit
+      storageKey="scholarai_results_chat_split"
+      defaultLeftPercent={56}
+      minLeftPercent={30}
+      maxLeftPercent={75}
+      left={leftColumn}
+      right={rightColumn}
+      className="w-full"
+    />
   );
 }

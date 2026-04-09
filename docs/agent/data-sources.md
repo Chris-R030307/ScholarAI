@@ -16,7 +16,7 @@ Env var **names** only; values live in `.env.local` or your secret store. See re
 
 | Item | Detail |
 |------|--------|
-| **Use** | Re-ranking, reasoning-heavy tasks (per product summary). |
+| **Use** | AI-guided search plans, chat, and legacy analyze route (per `pa.md`). |
 | **Env** | `DEEPSEEK_API_KEY` |
 | **Reminders** | Keep keys server-side; log request ids and latency, not full prompts if they contain sensitive text. |
 
@@ -28,7 +28,16 @@ Env var **names** only; values live in `.env.local` or your secret store. See re
 | **Env** | `GEMINI_API_KEY` (or `GOOGLE_API_KEY` if you standardize on Google AI Studio—**pick one** in `.env.example` and stick to it). |
 | **Reminders** | Obey [Google AI / Gemini terms](https://ai.google.dev/terms); mind quota and billing. |
 
-## Internal AI route (Phase 3)
+## Internal AI route (Phase 5 — AI search plan)
+
+| Item | Detail |
+|------|--------|
+| **URL** | `POST /api/ai/search-plan` (`web/src/app/api/ai/search-plan/route.ts`) |
+| **Body** | `{ "intent": string }` — natural-language research goal; bounded length (`AI_SEARCH_PLAN_MAX_INTENT_CHARS` in `constants.ts`). |
+| **Success JSON** | `{ "queries": string[], "filtersPatch": Partial<filter state>, "rationale"?: string, "provider": "deepseek" \| "gemini" }` — client merges `filtersPatch` into sidebar filters and runs Semantic Scholar for each query (first query drives pagination / load more). |
+| **Errors** | Same shape as other AI routes with `queries: []`, `filtersPatch: {}`, and `error`. Throttle channel `searchPlan` (10s per IP after success). |
+
+## Internal AI route (Phase 3 — analyze, optional / not used by main UI in v1.1)
 
 | Item | Detail |
 |------|--------|

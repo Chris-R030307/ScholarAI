@@ -6,6 +6,11 @@ Short, **append-only** log: **newest first**. No secrets, tokens, or key materia
 
 ## 2026-04-09
 
+### 2026-04-09 — Semantic Scholar `total` must stay optional for “load more”
+
+- **Symptom:** When the API omitted `total`, the adapter used `papers.length` as `total`, so the UI thought the first full page was the entire result set and hid **Load more**.
+- **Fix:** Return `total` only when the API includes it (`web/src/lib/semantic-scholar/search-papers.ts`). Aligns with **P5.7** in `plan.md`.
+
 ### 2026-04-09 — Doc layout: this repo vs older monorepo notes below
 
 - **Current tree:** Single Next.js app under **`web/`** with **`npm`** — see root **`README.md`** and **`human-notes.md`**. Later entries in this file that mention **pnpm**, **`apps/web`**, or **`packages/db`** describe a different layout; ignore them if those paths do not exist in your clone.

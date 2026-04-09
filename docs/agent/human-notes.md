@@ -80,9 +80,19 @@ npm run start
 curl -sS "http://localhost:3000/api/search?query=machine%20learning&limit=2" | head -c 800
 ```
 
-Expect JSON with `papers` (array) and usually `total`. If you see `error` with rate-limit messaging, add `SEMANTIC_SCHOLAR_API_KEY` to `web/.env.local` and retry.
+Expect JSON with `papers` (array) and optionally `total` (when the upstream API includes it — needed for correct **Load more** behavior). If you see `error` with rate-limit messaging, add `SEMANTIC_SCHOLAR_API_KEY` to `web/.env.local` and retry.
 
-**AI analyze (Phase 3)** — requires `DEEPSEEK_API_KEY` and/or `GEMINI_API_KEY` in `web/.env.local` (see repo root `.env.example`). Example with dev server on port 3000 (replace `PAPER_ID` with a real id from a search response):
+**AI search plan (Phase 5)** — requires `DEEPSEEK_API_KEY` and/or `GEMINI_API_KEY` in **`web/.env.local`** (not repo root `.env.local` — Next.js loads env from the `web/` directory when you run `npm run dev` there).
+
+```bash
+curl -sS -X POST "http://localhost:3000/api/ai/search-plan" \
+  -H "Content-Type: application/json" \
+  -d '{"intent":"papers about neural scaling laws for LLMs"}'
+```
+
+Expect JSON with `queries`, `filtersPatch`, optional `rationale`, and `provider`, or `error`. The home page **AI search** toggle calls this route before Semantic Scholar.
+
+**AI analyze (Phase 3, optional)** — same keys; not used by the main UI after v1.1:
 
 ```bash
 curl -sS -X POST "http://localhost:3000/api/ai/analyze" \
@@ -90,9 +100,7 @@ curl -sS -X POST "http://localhost:3000/api/ai/analyze" \
   -d '{"researchGoal":"machine learning","papers":[{"id":"PAPER_ID","title":"Example","abstract":"Short abstract."}]}'
 ```
 
-Expect JSON with `rankings` and `synthesis`, or `error`. The UI **AI mode** toggle calls this route with up to 20 visible papers.
-
-**AI research chat (Phase 4)** — same LLM keys as analyze. Example (ids/titles from a prior search):
+**AI research chat (Phase 4 / v1.1)** — same LLM keys. The UI sends only papers you **submit** from the checklist (up to 80 on the wire). Example:
 
 ```bash
 curl -sS -X POST "http://localhost:3000/api/ai/chat" \
@@ -100,7 +108,14 @@ curl -sS -X POST "http://localhost:3000/api/ai/chat" \
   -d '{"messages":[{"role":"user","content":"Which papers mention surveys?"}],"papers":[{"id":"PAPER_ID","title":"Example","abstract":"We conducted a survey of …"}]}'
 ```
 
-Expect JSON with `reply` (markdown), `citations` (paper ids), and `outOfCorpus` (boolean), or `error`. The sidebar **Research chat** uses the **filtered visible** list (up to 80 papers).
+Expect JSON with `reply` (markdown), `citations` (paper ids), and `outOfCorpus` (boolean), or `error`.
+
+### Troubleshooting LLM routes (`NO_PROVIDER`, `PARSE_ERROR`, timeouts)
+
+1. Confirm keys are in **`web/.env.local`** next to `web/package.json`, then **restart** `npm run dev` (Next.js only reads env at startup).
+2. Prefer one working provider: set **`DEEPSEEK_API_KEY`** *or* **`GEMINI_API_KEY`**; the server tries DeepSeek first when both exist.
+3. `PARSE_ERROR` often means the model returned non-JSON or invalid shape; retry once; if it persists, check provider status and quotas.
+4. For chat throttling, wait a few seconds between sends (`AI_CHAT_RATE_LIMIT_MS`). AI search plan uses a separate 10s cooldown after success (`searchPlan` channel in `rate-limit.ts`).
 
 ## Where configuration lives
 

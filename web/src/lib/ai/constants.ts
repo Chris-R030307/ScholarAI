@@ -17,3 +17,6 @@ export const AI_CHAT_TOP_CHUNKS = 18;
 export const AI_CHAT_MAX_INPUT_CHARS = 120_000;
 /** Minimum interval between successful chat completions per client key. */
 export const AI_CHAT_RATE_LIMIT_MS = 4000;
+
+/** Phase 5 — AI-guided search plan (NL → queries / filters). */
+export const AI_SEARCH_PLAN_MAX_INTENT_CHARS = 2000;

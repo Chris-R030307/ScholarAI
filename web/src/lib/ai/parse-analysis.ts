@@ -1,18 +1,9 @@
 import type { AiRanking } from "@/lib/ai/types";
+import { extractJsonObjectString } from "@/lib/ai/parse-llm-json";
 
 export type ParseAnalysisResult =
   | { ok: true; rankings: AiRanking[]; synthesis: string }
   | { ok: false; message: string };
-
-function extractJsonObject(raw: string): string | null {
-  const t = raw.trim();
-  const fence = /^```(?:json)?\s*([\s\S]*?)```$/m.exec(t);
-  const candidate = fence ? fence[1].trim() : t;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  if (start === -1 || end <= start) return null;
-  return candidate.slice(start, end + 1);
-}
 
 function clampScore(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -28,7 +19,7 @@ export function parseAnalysisJson(
   validIds: Set<string>,
   idOrder: string[],
 ): ParseAnalysisResult {
-  const jsonStr = extractJsonObject(raw);
+  const jsonStr = extractJsonObjectString(raw);
   if (!jsonStr) {
     return { ok: false, message: "Model output was not valid JSON." };
   }

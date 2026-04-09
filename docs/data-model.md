@@ -62,8 +62,8 @@ Implementation: `web/src/lib/venue-kind.ts` (`classifyVenueKind`).
 
 | Artifact | Shape (logical) | Notes |
 |----------|-----------------|--------|
-| Re-rank | `Array<{ paperId: string, score: number, note?: string }>` | Validate sort matches known ids. |
-| Synthesis | string (markdown) or structured sections | Must reference papers by title or id. |
+| Re-rank | `Array<{ paperId: string, score: number, note?: string }>` | Legacy **`/api/ai/analyze`** only; main UI does not re-rank after v1.1. |
+| Synthesis | string (markdown) or structured sections | Same legacy route; not shown on the home page after v1.1. |
 
 ## 5. RAG / chat (Phase 4)
 
@@ -82,6 +82,10 @@ Implementation: `web/src/lib/venue-kind.ts` (`classifyVenueKind`).
 ### Retrieval (Phase 4)
 
 - **Lexical scoring:** TF–IDF-style term scores over the in-memory chunk list for the current request (no embedding API). Top chunks are passed to the LLM with the conversation and corpus instructions (`docs/agent/pa.md`).
+
+### Chat corpus (v1.1 / Phase 5)
+
+- The **research chat** request body is still `{ messages, papers }`, but the UI only sends papers the user **checked** and **submitted** for chat — not the full filtered result list. Chat history resets when the submitted id-set changes.
 
 ## 6. Versioning
 

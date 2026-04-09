@@ -22,7 +22,7 @@ const DEFAULT_LIMIT = 20;
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export type SearchPapersResult =
-  | { ok: true; papers: Paper[]; total: number }
+  | { ok: true; papers: Paper[]; total?: number }
   | { ok: false; status: number; code: string; message: string };
 
 function logSearchOutcome(input: {
@@ -127,10 +127,11 @@ export async function searchSemanticScholarPapers(params: {
 
   const rows = Array.isArray(parsed.data) ? parsed.data : [];
   const papers = rows.map(mapSemanticScholarPaper);
+  /** Omit when API does not send `total` — do not substitute `papers.length` or load-more breaks. */
   const total =
     typeof parsed.total === "number" && Number.isFinite(parsed.total)
       ? Math.max(0, Math.floor(parsed.total))
-      : papers.length;
+      : undefined;
 
   logSearchOutcome({
     ms,
