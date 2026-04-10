@@ -1,6 +1,12 @@
 "use client";
 
-import { ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Check,
+} from "lucide-react";
 import { useId, useState } from "react";
 import type { Paper } from "@/lib/paper";
 
@@ -15,13 +21,13 @@ function authorSnippet(authors: Paper["authors"], max = 3): string {
 
 export function PaperCard({
   paper,
-  selection,
+  corpus,
 }: {
   paper: Paper;
-  /** Optional checklist row for Phase 5 chat corpus selection. */
-  selection?: {
-    checked: boolean;
-    onChange: (checked: boolean) => void;
+  /** Add-to-corpus control (Phase 6 cart). */
+  corpus?: {
+    inCorpus: boolean;
+    onAdd: () => void;
     disabled?: boolean;
   };
 }) {
@@ -41,17 +47,25 @@ export function PaperCard({
   return (
     <article className="rounded-xl border border-zinc-200/90 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/40">
       <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1">
-        {selection && (
-          <label className="flex shrink-0 cursor-pointer items-center gap-2 pt-0.5">
-            <input
-              type="checkbox"
-              checked={selection.checked}
-              disabled={selection.disabled}
-              onChange={(e) => selection.onChange(e.target.checked)}
-              className="size-4 rounded border-zinc-300 text-emerald-700 focus:ring-emerald-600 dark:border-zinc-600 dark:text-emerald-500"
-            />
-            <span className="sr-only">Include in research chat corpus</span>
-          </label>
+        {corpus && (
+          <button
+            type="button"
+            onClick={corpus.onAdd}
+            disabled={corpus.disabled || corpus.inCorpus}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-100 disabled:pointer-events-none disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            {corpus.inCorpus ? (
+              <>
+                <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                In corpus
+              </>
+            ) : (
+              <>
+                <Plus className="size-3.5" aria-hidden />
+                Add to corpus
+              </>
+            )}
+          </button>
         )}
         <h2 className="min-w-0 flex-1 text-base font-semibold leading-snug text-zinc-900 dark:text-zinc-50">
           {paper.title}

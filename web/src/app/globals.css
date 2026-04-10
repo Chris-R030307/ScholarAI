@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /** Shared motion tokens (Phase 6 polish) */
+  --motion-duration: 200ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @theme inline {

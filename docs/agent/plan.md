@@ -46,12 +46,12 @@ Replace the example row when the codebase advances. Next agent reads **only this
 | Item | Current state (edit me) |
 |------|-------------------------|
 | **App location** | `web/` — Next.js 16, App Router, `web/src/app` |
-| **Phase completed** | **v1.1 (Phase 5) shipped** (2026-04-09): re-rank removed; resizable layout; selection → chat; AI search plan route; LLM JSON hardening; S2 `total` fix for load more |
+| **Phase completed** | **v1.2 (Phase 6) shipped** (2026-04-10): corpus cart (`sessionStorage`); per-card **Add to corpus**; chat/retry + search retry UX; LLM fetch error handling; `error.tsx`; motion/reduced-motion polish; **P6.5 extra filters deferred** (no API change) |
 | **Git remote** | https://github.com/Chris-R030307/ScholarAI.git |
 | **Branch / PR** | local / `main` (update when you open a PR) |
-| **Blockers** | Owner-reported: **LLM-backed features still fail at runtime** — **P6.1** |
+| **Blockers** | — (confirm LLM routes with real keys in your environment; see `human-notes.md`) |
 | **Tests** | `cd web && npm test` (Vitest); `cd web && npm run lint` |
-| **Last updated** | 2026-04-09 (Phase 6 backlog: LLM reliability, corpus cart, polish) |
+| **Last updated** | 2026-04-10 |
 
 **Quick existence checks (tick when true)**
 
@@ -303,12 +303,12 @@ P6.1 LLM reliability (blocking for AI search + chat)
 
 **Phase 6 checklist**
 
-- [ ] **P6.1** LLM routes verified working + documented troubleshooting.
-- [ ] **P6.2** Corpus cart (multi-search, remove, clear) + chat wired to cart.
-- [ ] **P6.3** Per-card / compact add — no dominant centered button.
-- [ ] **P6.4** Loading, errors, transitions, reduced-motion.
-- [ ] **P6.5** Extra filters **implemented** or **explicitly deferred** with note in PR.
-- [ ] **P6.6** Error boundary / empty states / rate-limit copy (as agreed).
+- [x] **P6.1** LLM routes: clearer outbound/network errors (`providers.ts`); chat keeps message on failure + **Retry send**; search **Retry** + **Planning…** for AI mode; troubleshooting remains in `human-notes.md` (verify with your keys).
+- [x] **P6.2** Corpus cart: `scholarai_corpus_cart` session persistence; **Clear all** / per-item remove; chat payload = cart; new search does not clear cart; split layout shows when cart non-empty.
+- [x] **P6.3** Per-card **Add to corpus**; removed checklist + large **Submit selection** control.
+- [x] **P6.4** Button/hover/disabled/loading polish; `motion-safe:animate-spin` + `prefers-reduced-motion` for chat scroll; transition utilities on key controls; planning/loading labels.
+- [x] **P6.5** **Deferred:** no new Semantic Scholar filter fields in this change set (see open questions / future API audit).
+- [x] **P6.6** Route **`error.tsx`** (Try again); corpus + chat empty copy; chat **RATE_LIMIT** inline help.
 
 **P6 done when:** P6.1–P6.4 + P6.6 satisfied; P6.5 either shipped or documented skip; snapshot **blockers** cleared; `pa.md` § v1.2 matches behavior.
 

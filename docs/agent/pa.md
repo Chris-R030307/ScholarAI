@@ -5,17 +5,17 @@
 - **Personal tool first:** Optimize for a single operator’s research flow, not multi-tenant SaaS—unless the plan explicitly adds auth and isolation.
 - **Truth from APIs:** Paper metadata comes from **Semantic Scholar**; do not fabricate citations or links.
 - **Respect third-party terms:** Cache and rate limits must follow provider rules (see `data-sources.md`).
-- **Scoped AI:** **v1:** Analyze (rank + synthesis) and chat were grounded in retrieved papers. **v1.1 (shipped):** No LLM **re-rank** in the UI; **AI-guided search** (`POST /api/ai/search-plan` → Semantic Scholar). **Research chat** is grounded only in **user-submitted** checked papers. Avoid answering from unrelated training knowledge when the UX promises “these results.”
+- **Scoped AI:** **v1:** Analyze (rank + synthesis) and chat were grounded in retrieved papers. **v1.1 (shipped):** No LLM **re-rank** in the UI; **AI-guided search** (`POST /api/ai/search-plan` → Semantic Scholar). **v1.2 (shipped):** **Research chat** is grounded in the **corpus cart** (papers added per card, `sessionStorage`, survives new searches). Avoid answering from unrelated training knowledge when the UX promises “these results.”
 - **Progressive delivery:** Ship search UI before AI features; keep feature flags or toggles for AI mode.
 
 ## Main components (planned)
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Web UI (Next.js)** | Search, filters, result cards, AI toggles, chat panel, loading/error states. **v1.1:** Resizable **results \| chat** split; selection flows into chat corpus; **literal** vs **AI search** mode on the search control. **v1.2 (Phase 6):** **Corpus cart** — visible list beside/below chat, **survives new searches**, per-item **remove** + **clear**; compact **add** affordances on cards; **commercial polish** (loading, errors, transitions, `prefers-reduced-motion`). |
+| **Web UI (Next.js)** | Search, filters, result cards, AI toggles, chat panel, loading/error states. **v1.1:** Resizable **results \| chat** split; **literal** vs **AI search** mode. **v1.2 (shipped):** **Corpus cart** beside chat (`CorpusCartPanel`), **sessionStorage**, per-card **Add to corpus**, remove/clear; split visible when cart non-empty; loading/retry/reduced-motion polish. |
 | **Search adapter** | Calls Semantic Scholar search; maps fields to internal **Paper** shape (`../data-model.md`). |
 | **Filter / sort layer** | **Phase 2:** Client-side filtering and “Impactful” sort on the **accumulated** result list (all pages loaded via “Load more”). Semantic Scholar `paper/search` is unchanged except `offset`/`limit` for pagination. |
-| **AI services** | **`POST /api/ai/search-plan`** — NL intent → `queries[]` + `filtersPatch` (Phase 5). **`POST /api/ai/chat`** — RAG chat; corpus = **submitted** papers only. **`POST /api/ai/analyze`** — still in repo for manual/API use; **not** called from the main UI after v1.1. **Provider order:** `DEEPSEEK_API_KEY` first; on failure or absence, `GEMINI_API_KEY` (model `gemini-2.0-flash`). |
+| **AI services** | **`POST /api/ai/search-plan`** — NL intent → `queries[]` + `filtersPatch` (Phase 5). **`POST /api/ai/chat`** — RAG chat; corpus = **cart** papers (Phase 6). **`POST /api/ai/analyze`** — still in repo for manual/API use; **not** called from the main UI after v1.1. **Provider order:** `DEEPSEEK_API_KEY` first; on failure or absence, `GEMINI_API_KEY` (model `gemini-2.0-flash`). |
 | **API boundary** | **v1:** Next.js Route Handlers only (`web/src/app/api/...`). A separate FastAPI (or other) service is optional later—do not duplicate business logic across two stacks without reason. |
 
 **App package:** Next.js (App Router) lives in **`web/`** (`web/src/app`). Env template names stay at repo root **`.env.example`**; local overrides for the app use **`web/.env.local`** (see `docs/agent/human-notes.md`).
@@ -45,7 +45,7 @@
 1. **Phase 1:** Read-only search + cards; minimal state.
 2. **Phase 2:** Filters + pagination/load-more; deterministic sort rules documented. **Impactful** order: `citationCount` descending, then `year` descending, then `title` (locale compare).
 3. **Phase 3:** (Historical) Analyze route with scores + synthesis; **UI removed in v1.1** — no re-rank list or synthesis panel in `SearchSection`.
-4. **Phase 4:** RAG chat with **citations** and **out-of-corpus** JSON path. **v1.1:** Chat corpus = **user-submitted** papers; layout: **resizable** results \| chat (`ResizableSplit`); below `lg` stacks vertically.
+4. **Phase 4:** RAG chat with **citations** and **out-of-corpus** JSON path. **v1.1:** Chat corpus = **submitted** selection; **v1.2:** corpus = **cart**. Layout: **resizable** results \| chat (`ResizableSplit`); below `lg` stacks vertically; split also shows when the cart is non-empty so chat stays reachable without current results.
 
 ### v1.1 (Phase 5) — shipped
 
@@ -53,12 +53,11 @@
 - **LLM JSON:** `parse-llm-json.ts` shared helper for markdown-wrapped or noisy JSON (chat + search plan).
 - **Filters + pagination:** Single pipeline `applyFiltersAndSort` + `paginationQuery` / `inferHasMore`; Semantic Scholar `total` only when API returns it.
 
-### v1.2 (Phase 6) — planned
+### v1.2 (Phase 6) — shipped
 
-- **LLM reliability:** Treat broken provider paths as **P0** — env resolution, outbound `fetch`, model IDs, timeouts, and user-visible errors (see `plan.md` **P6.1**).
-- **Corpus cart:** Chat RAG input is the **cart** set; **independent** of the current search result array (user can search, add, search again, add). Document cart shape in `data-model.md` when stabilized.
-- **UX quality:** Avoid “stuck” interactions — explicit **pending** states for search, plan, and chat; optional **error boundary** for soft failures.
-- **More filters:** Only with **API-backed** fields; default **defer** extra filters until core AI + search are stable (`plan.md` **P6.5**).
+- **Corpus cart:** `CorpusCartPanel` + `corpus-cart-storage.ts` (`scholarai_corpus_cart`); **Add to corpus** on `PaperCard`; chat payload = cart; cart **not** cleared on new search.
+- **LLM / UX:** Wrapped provider `fetch` errors; search **Retry** + AI **Planning…**; chat **Dismiss / Retry send**; route `error.tsx` for uncaught render errors; `motion-safe:animate-spin` and reduced-motion-friendly chat scroll.
+- **More filters:** Deferred until Semantic Scholar fields are audited (`plan.md` **P6.5**).
 
 ## Cross-cutting concerns
 
@@ -67,6 +66,6 @@
 | **Auth** | Defer unless multi-user or cloud deployment requires it. |
 | **Observability** | Structured logs for search and LLM calls (latency, error class); **no** raw API keys or full user prompts in logs if they contain secrets. AI analyze logs JSON lines: `op`, `durationMs`, `outcome`, `provider` (no prompt body). |
 | **Compliance / ethics** | Respect Semantic Scholar and LLM provider ToS; surface attribution and links to originals. |
-| **Security** | Validate LLM JSON before trusting citations or search-plan fields; model markdown rendered with `react-markdown` (no raw HTML plugin—reduces XSS from LLM output); SSRF protection if fetching URLs (PDF phase). |
+| **Security** | Validate LLM JSON before trusting citations or search-plan fields; model markdown rendered with `react-markdown` (no raw HTML plugin—reduces XSS from LLM output); SSRF protection if fetching URLs (PDF phase). **Resilience:** App Router `error.tsx` for soft recovery from client tree failures. |
 
 When behavior or persistence changes, update **`pa.md`** and **`plan.md`** together.

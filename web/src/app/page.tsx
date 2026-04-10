@@ -9,7 +9,7 @@ export default function Home() {
         </h1>
         <p className="text-zinc-600 dark:text-zinc-400">
           Semantic Scholar search with filters, load more, optional AI-guided
-          queries, and research chat over papers you select.
+          queries, and research chat over a corpus you build from results.
         </p>
       </div>
       <SearchSection />

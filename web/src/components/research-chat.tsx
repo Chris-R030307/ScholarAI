@@ -27,8 +27,8 @@ function toApiMessages(msgs: LocalMsg[]): ChatTurn[] {
 }
 
 type Props = {
-  /** `null` = user has not submitted a corpus yet (Phase 5). */
-  corpusPapers: Paper[] | null;
+  /** Papers in the corpus cart (Phase 6); chat is disabled when empty. */
+  corpusPapers: Paper[];
   corpusSignature: string;
   disabled?: boolean;
 };
@@ -38,8 +38,8 @@ export function ResearchChat({
   corpusSignature,
   disabled,
 }: Props) {
-  const awaitingCorpus = corpusPapers === null;
-  const papers = useMemo(() => corpusPapers ?? [], [corpusPapers]);
+  const papers = corpusPapers;
+  const awaitingCorpus = papers.length === 0;
   const [messages, setMessages] = useState<LocalMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,6 +49,13 @@ export function ResearchChat({
   const [lastProvider, setLastProvider] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevSig = useRef<string | null>(null);
+  const prefersReducedMotion = useRef(false);
+
+  useEffect(() => {
+    prefersReducedMotion.current =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
 
   useEffect(() => {
     if (prevSig.current !== null && prevSig.current !== corpusSignature) {
@@ -60,7 +67,9 @@ export function ResearchChat({
   }, [corpusSignature]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion.current ? "auto" : "smooth",
+    });
   }, [messages, loading]);
 
   const titleById = useMemo(() => {
@@ -90,7 +99,6 @@ export function ResearchChat({
     )
       return;
     setErr(null);
-    setInput("");
     const userTurn: LocalUser = { role: "user", content: text };
     const prior = messages;
     const nextHistory: LocalMsg[] = [...prior, userTurn];
@@ -117,6 +125,7 @@ export function ResearchChat({
         });
         return;
       }
+      setInput("");
       setLastProvider(data.provider ?? null);
       const assistantTurn: LocalAssistant = {
         role: "assistant",
@@ -150,9 +159,15 @@ export function ResearchChat({
     void send();
   }
 
+  const retryable =
+    err &&
+    (err.code === "LLM_ERROR" ||
+      err.code === "PARSE_ERROR" ||
+      err.code === "TIMEOUT");
+
   return (
     <section
-      className="rounded-xl border border-sky-200/90 bg-sky-50/50 p-4 dark:border-sky-900/50 dark:bg-sky-950/20"
+      className="rounded-xl border border-sky-200/90 bg-sky-50/50 p-4 transition-colors duration-150 motion-reduce:transition-none dark:border-sky-900/50 dark:bg-sky-950/20"
       aria-label="Research chat"
     >
       <h2 className="mb-2 flex items-center gap-2 text-sm font-medium text-sky-950 dark:text-sky-100">
@@ -166,22 +181,23 @@ export function ResearchChat({
       </h2>
       <p className="mb-3 text-xs text-sky-900/85 dark:text-sky-200/80">
         {awaitingCorpus
-          ? "Submit a paper selection from the list to scope this chat. Answers use only those papers; unrelated questions get a scoped refusal."
-          : "Answers use only the papers you submitted for chat. Unrelated questions get a scoped refusal."}
+          ? "Add papers to your corpus from results. Chat answers use only those papers; unrelated questions get a scoped refusal."
+          : "Answers use only papers in your corpus. Unrelated questions get a scoped refusal."}
       </p>
       <div className="mb-3 max-h-64 space-y-3 overflow-y-auto rounded-lg border border-sky-200/60 bg-white/80 px-3 py-2 dark:border-sky-900/40 dark:bg-zinc-950/40">
         {awaitingCorpus && messages.length === 0 && !loading && (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Check one or more papers in the results list, then click{" "}
-            <strong className="font-medium text-zinc-700 dark:text-zinc-300">
-              Submit selection for chat
-            </strong>
-            .
+            Use{" "}
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">
+              Add to corpus
+            </span>{" "}
+            on result cards. Your list is saved for this session even if you
+            search again.
           </p>
         )}
         {!awaitingCorpus && messages.length === 0 && !loading && (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Ask about methods, themes, or comparisons across your selected
+            Ask about methods, themes, or comparisons across your corpus
             papers.
           </p>
         )}
@@ -219,7 +235,10 @@ export function ResearchChat({
         ))}
         {loading && (
           <p className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            <Loader2
+              className="size-3.5 motion-safe:animate-spin"
+              aria-hidden
+            />
             Thinking…
           </p>
         )}
@@ -231,6 +250,25 @@ export function ResearchChat({
           className="mb-2 rounded-md border border-red-200 bg-red-50/90 px-2 py-1.5 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-100"
         >
           <p>{err.message}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setErr(null)}
+              className="rounded border border-red-200/80 bg-white px-2 py-0.5 text-[11px] font-medium hover:bg-red-50 dark:border-red-800 dark:bg-red-950/20 dark:hover:bg-red-950/40"
+            >
+              Dismiss
+            </button>
+            {retryable && input.trim() !== "" && (
+              <button
+                type="button"
+                onClick={() => void send()}
+                disabled={loading || disabled}
+                className="rounded border border-red-200/80 bg-white px-2 py-0.5 text-[11px] font-medium hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:bg-red-950/20 dark:hover:bg-red-950/40"
+              >
+                Retry send
+              </button>
+            )}
+          </div>
           {err.code === "NO_PROVIDER" && (
             <p className="mt-2 border-t border-red-200/80 pt-2 text-red-800/95 dark:border-red-800/50 dark:text-red-100/90">
               Add{" "}
@@ -246,6 +284,12 @@ export function ResearchChat({
                 web/.env.local
               </code>{" "}
               and restart the dev server.
+            </p>
+          )}
+          {err.code === "RATE_LIMIT" && (
+            <p className="mt-2 border-t border-red-200/80 pt-2 text-red-800/95 dark:border-red-800/50 dark:text-red-100/90">
+              The server limits how often you can send chat messages. Wait a few
+              seconds, then try again.
             </p>
           )}
         </div>
@@ -274,9 +318,19 @@ export function ResearchChat({
             papers.length === 0 ||
             !input.trim()
           }
-          className="self-start rounded-lg bg-sky-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-800 disabled:opacity-60 dark:bg-sky-600 dark:hover:bg-sky-500"
+          className="self-start rounded-lg bg-sky-700 px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 hover:bg-sky-800 disabled:opacity-60 motion-reduce:transition-none dark:bg-sky-600 dark:hover:bg-sky-500"
         >
-          Send
+          {loading ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Loader2
+                className="size-3.5 motion-safe:animate-spin"
+                aria-hidden
+              />
+              Send
+            </span>
+          ) : (
+            "Send"
+          )}
         </button>
       </form>
     </section>

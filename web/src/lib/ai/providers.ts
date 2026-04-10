@@ -5,9 +5,20 @@ type LlmErr = { error: string; status?: number };
 
 async function readErrorMessage(res: Response): Promise<string> {
   try {
-    const j = (await res.json()) as { error?: { message?: string } };
-    const m = j?.error?.message;
-    if (typeof m === "string" && m) return m;
+    const text = await res.text();
+    if (text) {
+      try {
+        const j = JSON.parse(text) as {
+          error?: { message?: string };
+          message?: string;
+        };
+        const m = j?.error?.message ?? j?.message;
+        if (typeof m === "string" && m) return m;
+      } catch {
+        const t = text.slice(0, 280).trim();
+        if (t) return t;
+      }
+    }
   } catch {
     /* ignore */
   }
@@ -20,29 +31,41 @@ export async function callDeepSeekJson(params: {
   user: string;
   signal: AbortSignal;
 }): Promise<LlmOk | LlmErr> {
-  const res = await fetch("https://api.deepseek.com/chat/completions", {
-    method: "POST",
-    signal: params.signal,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "deepseek-chat",
-      messages: [
-        { role: "system", content: params.system },
-        { role: "user", content: params.user },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: AI_LLM_MAX_OUTPUT_TOKENS,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      signal: params.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${params.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: params.system },
+          { role: "user", content: params.user },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: AI_LLM_MAX_OUTPUT_TOKENS,
+      }),
+    });
+  } catch (e) {
+    const msg =
+      e instanceof Error ? e.message : "Network error calling DeepSeek.";
+    return { error: `DeepSeek request failed: ${msg}` };
+  }
   if (!res.ok) {
     return { error: await readErrorMessage(res), status: res.status };
   }
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
+  let data: { choices?: Array<{ message?: { content?: string } }> };
+  try {
+    data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+  } catch {
+    return { error: "Invalid JSON from DeepSeek." };
+  }
   const raw = data.choices?.[0]?.message?.content;
   if (typeof raw !== "string" || raw.trim() === "") {
     return { error: "Empty DeepSeek response." };
@@ -63,27 +86,42 @@ export async function callGeminiJson(params: {
   );
   url.searchParams.set("key", params.apiKey);
 
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    signal: params.signal,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: params.system }] },
-      contents: [{ role: "user", parts: [{ text: params.user }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        maxOutputTokens: AI_LLM_MAX_OUTPUT_TOKENS,
-      },
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method: "POST",
+      signal: params.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: params.system }] },
+        contents: [{ role: "user", parts: [{ text: params.user }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: AI_LLM_MAX_OUTPUT_TOKENS,
+        },
+      }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Network error";
+    return { error: `Gemini request failed (${msg}).` };
+  }
   if (!res.ok) {
     return { error: await readErrorMessage(res), status: res.status };
   }
-  const data = (await res.json()) as {
+  let data: {
     candidates?: Array<{
       content?: { parts?: Array<{ text?: string }> };
     }>;
   };
+  try {
+    data = (await res.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+  } catch {
+    return { error: "Gemini returned invalid JSON." };
+  }
   const parts = data.candidates?.[0]?.content?.parts;
   const raw = parts?.map((p) => p.text ?? "").join("") ?? "";
   if (raw.trim() === "") {

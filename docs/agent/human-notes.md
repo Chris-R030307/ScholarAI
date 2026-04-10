@@ -100,7 +100,7 @@ curl -sS -X POST "http://localhost:3000/api/ai/analyze" \
   -d '{"researchGoal":"machine learning","papers":[{"id":"PAPER_ID","title":"Example","abstract":"Short abstract."}]}'
 ```
 
-**AI research chat (Phase 4 / v1.1)** — same LLM keys. The UI sends only papers you **submit** from the checklist (up to 80 on the wire). Example:
+**AI research chat (Phase 4 / v1.2)** — same LLM keys. The UI sends papers from your **corpus cart** (built with **Add to corpus** on each card; cart is stored in **`sessionStorage`** and survives new searches; up to 80 papers on the wire). Example:
 
 ```bash
 curl -sS -X POST "http://localhost:3000/api/ai/chat" \
@@ -112,10 +112,11 @@ Expect JSON with `reply` (markdown), `citations` (paper ids), and `outOfCorpus` 
 
 ### Troubleshooting LLM routes (`NO_PROVIDER`, `PARSE_ERROR`, timeouts)
 
-1. Confirm keys are in **`web/.env.local`** next to `web/package.json`, then **restart** `npm run dev` (Next.js only reads env at startup).
+1. Confirm keys are in **`web/.env.local`** next to `web/package.json`, then **restart** `npm run dev` (Next.js only reads env at startup). Running `next dev` from the **repo root** without `cd web` may not load `web/.env.local` — prefer **`cd web && npm run dev`**.
 2. Prefer one working provider: set **`DEEPSEEK_API_KEY`** *or* **`GEMINI_API_KEY`**; the server tries DeepSeek first when both exist.
-3. `PARSE_ERROR` often means the model returned non-JSON or invalid shape; retry once; if it persists, check provider status and quotas.
-4. For chat throttling, wait a few seconds between sends (`AI_CHAT_RATE_LIMIT_MS`). AI search plan uses a separate 10s cooldown after success (`searchPlan` channel in `rate-limit.ts`).
+3. `PARSE_ERROR` often means the model returned non-JSON or invalid shape; use **Retry send** in the chat panel or **Retry search** after AI search; if it persists, check provider status and quotas.
+4. Network or DNS failures surface as `LLM_ERROR` with “request failed” in the message; fix connectivity and retry.
+5. For chat throttling, wait a few seconds between sends (`AI_CHAT_RATE_LIMIT_MS`). AI search plan uses a separate 10s cooldown after success (`searchPlan` channel in `rate-limit.ts`).
 
 ## Where configuration lives
 

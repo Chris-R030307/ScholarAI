@@ -4,6 +4,13 @@ Short, **append-only** log: **newest first**. No secrets, tokens, or key materia
 
 ---
 
+## 2026-04-10
+
+### 2026-04-10 — Phase 6: corpus cart + LLM UX hardening
+
+- **Cart:** Research chat corpus is no longer cleared on each new search; papers live in **`sessionStorage`** (`scholarai_corpus_cart`) with **Add to corpus** on cards (`corpus-cart-storage.ts`, `CorpusCartPanel`).
+- **LLM:** Provider `fetch` calls wrap network failures with readable errors; chat keeps the typed message on failure and offers **Dismiss / Retry send**; search errors offer **Retry search**. Confirm **`web/.env.local`** + **`cd web && npm run dev`** if routes return `NO_PROVIDER`.
+
 ## 2026-04-09
 
 ### 2026-04-09 — Semantic Scholar `total` must stay optional for “load more”

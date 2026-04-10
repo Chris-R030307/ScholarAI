@@ -85,7 +85,14 @@ Implementation: `web/src/lib/venue-kind.ts` (`classifyVenueKind`).
 
 ### Chat corpus (v1.1 / Phase 5)
 
-- The **research chat** request body is still `{ messages, papers }`, but the UI only sends papers the user **checked** and **submitted** for chat — not the full filtered result list. Chat history resets when the submitted id-set changes.
+- The **research chat** request body is still `{ messages, papers }`. **v1.1:** the UI sent only **checked + submitted** papers. **v1.2 (Phase 6):** the UI sends papers from the **corpus cart** — deduped by `id`, **persisted in `sessionStorage`** (`scholarai_corpus_cart`), **not cleared on new search**. Chat history resets when the cart’s id-set changes (add/remove/clear).
+
+### Corpus cart (v1.2 / Phase 6)
+
+| Field | Type | Notes |
+|-------|------|--------|
+| Storage | `sessionStorage` key `scholarai_corpus_cart` | JSON array of full `Paper` objects; invalid entries dropped on load. |
+| Wire to `/api/ai/chat` | `papers[]` | Same shape as before; max bounds in `constants.ts`. |
 
 ## 6. Versioning
 
