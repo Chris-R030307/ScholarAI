@@ -26,6 +26,10 @@ These rules apply to **what you write in chat**. They do **not** relax **code, t
 
 - **Do not write code** unless the user asked you to; ask **one** clarifying question if the ask is ambiguous.
 
+## User-reported bugs (when cause is unclear)
+
+- You **may** ask the user for **targeted** extra information (repro steps, exact URL/host, browser/device, console or Network-tab errors, whether it works on `localhost` but not on a LAN URL). **Only when necessary** to narrow the failure — do not interrogate on every message.
+
 - **endings** end of every reply, append "Done"
 
 ## After coding sessions,

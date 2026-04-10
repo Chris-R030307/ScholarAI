@@ -59,6 +59,13 @@
 - **LLM / UX:** Wrapped provider `fetch` errors; search **Retry** + AI **Planning…**; chat **Dismiss / Retry send**; route `error.tsx` for uncaught render errors; `motion-safe:animate-spin` and reduced-motion-friendly chat scroll.
 - **More filters:** Deferred until Semantic Scholar fields are audited (`plan.md` **P6.5**).
 
+### v1.3 (Phase 7) — planned (see `plan.md`)
+
+- **LAN dev:** Document and standardize `next dev -H 0.0.0.0`; investigate client bundle/hydration when opened via LAN IP (avoid native form fallback to `GET /?query=`).
+- **LLM provider choice:** User-selectable **DeepSeek** vs **Gemini** for **AI search plan** and **research chat** (server validates against configured keys; see Phase 7 in `plan.md`).
+- **AI search UX:** After the plan step, **show** generated Scholar query/queries (and relevant filter hints) and let the user **edit** before executing Semantic Scholar.
+- **Chat:** Full **multi-turn** thread in-session (no cross-session memory); **export** current chat (e.g. Markdown download).
+
 ## Cross-cutting concerns
 
 | Concern | Direction |

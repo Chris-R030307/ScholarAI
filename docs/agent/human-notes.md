@@ -30,6 +30,15 @@ cd web
 npm run dev
 ```
 
+**Phone or another device on your LAN:** If the page loads from `http://<your-lan-ip>:<port>/` but search “only refreshes” (URL shows `?query=…` and results never load), the browser may not be running the client bundle (failed `_next/static` loads, or submit before hydration). Bind on all interfaces and use the printed **Network** URL:
+
+```bash
+cd web
+npx next dev -H 0.0.0.0
+```
+
+Then open the **Network** address shown in the terminal from the other device. If problems persist, check DevTools → **Network** for red entries under `_next/` or `/api/search`.
+
 ### Open the main page (home)
 
 The landing UI lives at the app root **`/`** (implemented as `web/src/app/page.tsx`).
@@ -117,6 +126,18 @@ Expect JSON with `reply` (markdown), `citations` (paper ids), and `outOfCorpus` 
 3. `PARSE_ERROR` often means the model returned non-JSON or invalid shape; use **Retry send** in the chat panel or **Retry search** after AI search; if it persists, check provider status and quotas.
 4. Network or DNS failures surface as `LLM_ERROR` with “request failed” in the message; fix connectivity and retry.
 5. For chat throttling, wait a few seconds between sends (`AI_CHAT_RATE_LIMIT_MS`). AI search plan uses a separate 10s cooldown after success (`searchPlan` channel in `rate-limit.ts`).
+
+## LLM prompts (where to read or change them)
+
+To **inspect or tune** what the app sends to DeepSeek / Gemini, edit the **server-only** modules under `web/src/lib/ai/`:
+
+| Flow | Prompt builder | Notes |
+|------|----------------|--------|
+| **AI search mode** (NL → Scholar-style queries + optional filters) | `build-search-plan-prompt.ts` | Used by `POST /api/ai/search-plan` before Semantic Scholar runs. |
+| **Research chat** (corpus-grounded Q&A) | `build-chat-prompt.ts` | Used by `POST /api/ai/chat` with retrieved chunks + message history. |
+| **Analyze** (optional / not main UI) | `build-prompt.ts` | `POST /api/ai/analyze` for experiments or external callers. |
+
+**Monitoring:** There is no separate “prompt dashboard.” Use these files, structured server logs (see `pa.md` — no full prompt text in production if it may contain secrets), or temporary dev-only logging you remove before merge. **Never commit API keys.**
 
 ## Where configuration lives
 

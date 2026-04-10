@@ -46,12 +46,12 @@ Replace the example row when the codebase advances. Next agent reads **only this
 | Item | Current state (edit me) |
 |------|-------------------------|
 | **App location** | `web/` — Next.js 16, App Router, `web/src/app` |
-| **Phase completed** | **v1.2 (Phase 6) shipped** (2026-04-10): corpus cart (`sessionStorage`); per-card **Add to corpus**; chat/retry + search retry UX; LLM fetch error handling; `error.tsx`; motion/reduced-motion polish; **P6.5 extra filters deferred** (no API change) |
+| **Phase completed** | **v1.2 (Phase 6) shipped** (2026-04-10). **Phase 7 (v1.3)** queued: LAN dev, LLM provider picker, AI search review/edit step, chat thread + export (see § Phase 7). |
 | **Git remote** | https://github.com/Chris-R030307/ScholarAI.git |
 | **Branch / PR** | local / `main` (update when you open a PR) |
 | **Blockers** | — (confirm LLM routes with real keys in your environment; see `human-notes.md`) |
 | **Tests** | `cd web && npm test` (Vitest); `cd web && npm run lint` |
-| **Last updated** | 2026-04-10 |
+| **Last updated** | 2026-04-11 |
 
 **Quick existence checks (tick when true)**
 
@@ -314,6 +314,36 @@ P6.1 LLM reliability (blocking for AI search + chat)
 
 ---
 
+## Phase 7 — v1.3 LAN dev, provider picker, AI search review step, chat thread + export
+
+**Goal:** Fix or clearly document **dev access from other devices** on the LAN; let the user **pick DeepSeek vs Gemini** wherever the UI calls the LLM (AI search + chat); make **AI search** transparent and **editable** before hitting Semantic Scholar; align **chat** with a familiar **multi-turn** thread and add **download** of the current conversation. **No** long-term / cross-session chat memory beyond existing `sessionStorage` patterns (corpus cart, etc.).
+
+**Product references:** [`../project summary.md`](../project%20summary.md). Prompt file index: [`human-notes.md`](./human-notes.md) § **LLM prompts**.
+
+### Confirmed scope (owner + prior notes)
+
+| ID | Item | Outcome for implementer |
+|----|------|-------------------------|
+| **P7.0** | **LAN / network URL** | Repro: main page loads from `http://<lan-ip>:port` but search appears to “refresh” only (`GET /?query=…` without client-driven `/api/search`). **Fix** root cause if code-related (hydration, asset base URL, form fallback), or **document** required dev flags (`next dev -H 0.0.0.0`) and troubleshooting (Network tab for `_next/*`, `/api/search`). Update `human-notes.md` run section (already has a LAN stub — keep accurate). |
+| **P7.1** | **Provider picker** | UI: user chooses **DeepSeek** or **Gemini** for (a) **AI search plan** and (b) **research chat**. **API:** extend `POST /api/ai/search-plan` and `POST /api/ai/chat` with an optional or required `provider` field (`deepseek` \| `gemini`); server **rejects** or **disables** choices when the corresponding env key is missing. Persist choice in `sessionStorage` or component state for the session. Update `pa.md` (replace “DeepSeek first” auto-order with documented precedence when user selects “auto” if you keep an auto mode). |
+| **P7.2** | **AI search behavior** | **Yes:** AI search mode is **NL intent → LLM → structured plan** (`queries[]`, `filtersPatch`, etc.) → then Semantic Scholar. **Change:** insert a **review step**: show generated **query string(s)** (and surface filter deltas in plain language or controls), allow **inline edit**, then **Confirm / Run search** (do not rely only on immediate auto-execute after plan returns). Keep rate limits and error handling from P5/P6. |
+| **P7.3** | **Prompt monitoring** | No new product surface required for v1.3; operators use **`human-notes.md` § LLM prompts** (`build-search-plan-prompt.ts`, `build-chat-prompt.ts`, `build-prompt.ts`). Optional dev-only logging is a spike — if added, gate behind env flag and **never** log secrets or production PII. |
+| **P7.4** | **Chat UX** | **Multi-turn:** one scrolling thread, user messages + assistant replies stacked (standard chat pattern); preserve **full in-session** history for the active thread until refresh or explicit clear. **Export:** button to **download** current chat as `.md` or `.txt` (client-generated from message state). **No** new server-side “memory” across browser sessions. |
+| **P7.5** | **Cursor communication rule** | **Done:** `.cursor/rules/scholarai-communication.mdc` — agents may ask **targeted** repro details when a user-reported bug’s cause is unclear, **only when necessary**. |
+
+### Phase 7 checklist
+
+- [ ] **P7.0** LAN / network dev: behavior fixed or documented; `human-notes.md` matches.
+- [ ] **P7.1** Provider picker wired end-to-end for search-plan + chat; API validation; `pa.md` + `.env.example` / `data-sources.md` if new env or body fields.
+- [ ] **P7.2** AI search review + edit + confirm before Semantic Scholar.
+- [ ] **P7.3** Prompt locations documented (verify `human-notes.md` stays the index).
+- [ ] **P7.4** Chat thread UX + download; no cross-session memory requirement.
+- [ ] **P7.5** Rule file present (no further plan work unless text changes).
+
+**P7 done when:** All P7 checkboxes ticked; snapshot table names **v1.3** or “Phase 7 shipped”; `pa.md` § v1.3 matches shipped behavior.
+
+---
+
 ## Parallel work (multiple agents)
 
 | Track | Safe after | Focus | Avoid |
@@ -328,6 +358,7 @@ P6.1 LLM reliability (blocking for AI search + chat)
 
 ## Open questions (resolve → move to `pa.md` or snapshot)
 
+- **LAN-only dev quirks:** If P7.0 cannot fully fix “phone loads shell but search falls back to `GET /?query=`,” capture root cause in `issuesnotes.md` (device/browser, Next version, binding flags).
 - **Deployment:** Local-only vs hosted (auth, secrets, CORS, rate limits) — decide when you ship beyond localhost.
 - **Journal vs conference:** Heuristic limits; optional manual override later?
 - **PDF pipeline:** Deferred past v1 unless explicitly scoped (Gemini PDF analysis).
