@@ -4,6 +4,29 @@ Short, **append-only** log: **newest first**. No secrets, tokens, or key materia
 
 ---
 
+## 2026-04-11
+
+### 2026-04-11 — Administrator `SCHOLARAI_LLM_DISABLED` + `GET /api/site-config`
+
+- **`SCHOLARAI_LLM_DISABLED`** (truthy string) turns off **`/api/ai/*`** and hides AI UI; **Semantic Scholar** search unchanged. **`human-notes.md`** § Administrator checklist.
+
+### 2026-04-11 — Optional friends-only access gate
+
+- **Env:** set **both** `SCHOLARAI_ACCESS_CODE` and `ACCESS_GATE_SECRET` in **`web/.env.local`** or the host (Vercel) to enable; omit either → site stays **open**.
+- **Flow:** `middleware.ts` redirects unauthenticated users to **`/access`**; **`POST /api/auth/unlock`** checks the code (timing-safe compare), sets **httpOnly** JWT cookie (**jose**, ~30d), rate-limits bad guesses per IP.
+
+### 2026-04-11 — LAN: `allowedDevOrigins` + no `useSearchParams` on home
+
+- **Symptom:** Page loads over `http://<LAN-IP>:PORT` but **no buttons work** (React never runs).
+- **Cause:** Next **dev** blocks `/_next/*` when the browser **Origin** host is not allowlisted (defaults favor `localhost`). Scripts get **403**; only HTML is visible.
+- **Fix:** `web/next.config.ts` → **`allowedDevOrigins`** for common RFC1918-style host patterns; **restart** dev server. URL `?query=` bootstrap uses **`window.location`** once (no `useSearchParams` on the home `SearchSection`).
+
+### 2026-04-11 — LAN search: `/?query=` full navigation + empty field
+
+- **Symptom:** On `http://<LAN-IP>:PORT`, clicking **Search** turned the URL into **`/?query=…`** while the input went blank and no API search ran.
+- **Cause:** The control was a native **GET** form with **`name="query"`**. If the client bundle did not run (or submit raced hydration), the browser performed a **document navigation** instead of `fetch`; React state stayed empty.
+- **Fix:** Replaced the wrapper with **`role="search"`** (no GET submit), **`type="button"`** for the action, **Enter** handled in JS, and a one-time bootstrap from **`?query=`** via **`useSearchParams`** + **`router.replace`** (`search-section.tsx`, **`Suspense`** on the home page).
+
 ## 2026-04-10
 
 ### 2026-04-10 — Phase 6: corpus cart + LLM UX hardening

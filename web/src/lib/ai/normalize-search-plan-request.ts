@@ -1,7 +1,11 @@
 import { AI_SEARCH_PLAN_MAX_INTENT_CHARS } from "@/lib/ai/constants";
 
 export type NormalizeSearchPlanBodyResult =
-  | { ok: true; intent: string }
+  | {
+      ok: true;
+      intent: string;
+      providerPreference?: "deepseek" | "gemini";
+    }
   | { ok: false; code: string; message: string };
 
 export function normalizeSearchPlanBody(body: unknown): NormalizeSearchPlanBodyResult {
@@ -21,5 +25,21 @@ export function normalizeSearchPlanBody(body: unknown): NormalizeSearchPlanBodyR
       message: `Intent is too long (max ${AI_SEARCH_PLAN_MAX_INTENT_CHARS} characters).`,
     };
   }
-  return { ok: true, intent: t };
+
+  const prefRaw = o.providerPreference;
+  let providerPreference: "deepseek" | "gemini" | undefined;
+  if (prefRaw !== undefined && prefRaw !== null) {
+    if (prefRaw !== "deepseek" && prefRaw !== "gemini") {
+      return {
+        ok: false,
+        code: "BAD_REQUEST",
+        message: 'Field providerPreference must be "deepseek" or "gemini" when provided.',
+      };
+    }
+    providerPreference = prefRaw;
+  }
+
+  return providerPreference
+    ? { ok: true, intent: t, providerPreference }
+    : { ok: true, intent: t };
 }

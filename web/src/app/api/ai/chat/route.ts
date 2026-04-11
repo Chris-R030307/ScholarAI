@@ -11,6 +11,7 @@ import {
 } from "@/lib/ai/rate-limit";
 import { retrieveTopChunks } from "@/lib/ai/retrieve-chunks";
 import type { AiChatResponse } from "@/lib/ai/types";
+import { isLlmAdminDisabled } from "@/lib/llm-admin";
 
 export const runtime = "nodejs";
 
@@ -41,6 +42,26 @@ function logOutcome(params: {
 
 export async function POST(req: Request) {
   const t0 = Date.now();
+
+  if (isLlmAdminDisabled()) {
+    const bodyJson: AiChatResponse = {
+      reply: "",
+      citations: [],
+      outOfCorpus: true,
+      error: {
+        code: "LLM_DISABLED",
+        message:
+          "AI chat is turned off on this server. The site owner can enable it in the host environment.",
+      },
+    };
+    logOutcome({
+      op: "ai_chat",
+      durationMs: Date.now() - t0,
+      outcome: "client_error",
+    });
+    return NextResponse.json(bodyJson, { status: 503 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -77,6 +98,44 @@ export async function POST(req: Request) {
 
   const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim() || undefined;
   const geminiKey = process.env.GEMINI_API_KEY?.trim() || undefined;
+  const pref = norm.providerPreference;
+
+  if (pref === "deepseek" && !deepseekKey) {
+    const bodyJson: AiChatResponse = {
+      reply: "",
+      citations: [],
+      outOfCorpus: true,
+      error: {
+        code: "PROVIDER_UNAVAILABLE",
+        message:
+          "DeepSeek is selected but DEEPSEEK_API_KEY is not set. Choose Gemini in the model picker or add the key to web/.env.local.",
+      },
+    };
+    logOutcome({
+      op: "ai_chat",
+      durationMs: Date.now() - t0,
+      outcome: "client_error",
+    });
+    return NextResponse.json(bodyJson, { status: 503 });
+  }
+  if (pref === "gemini" && !geminiKey) {
+    const bodyJson: AiChatResponse = {
+      reply: "",
+      citations: [],
+      outOfCorpus: true,
+      error: {
+        code: "PROVIDER_UNAVAILABLE",
+        message:
+          "Gemini is selected but GEMINI_API_KEY is not set. Choose DeepSeek in the model picker or add the key to web/.env.local.",
+      },
+    };
+    logOutcome({
+      op: "ai_chat",
+      durationMs: Date.now() - t0,
+      outcome: "client_error",
+    });
+    return NextResponse.json(bodyJson, { status: 503 });
+  }
 
   if (!deepseekKey && !geminiKey) {
     const bodyJson: AiChatResponse = {
@@ -140,6 +199,7 @@ export async function POST(req: Request) {
       system,
       user,
       signal: controller.signal,
+      preference: pref,
     });
 
     if (!llm.ok) {
@@ -159,7 +219,7 @@ export async function POST(req: Request) {
         op: "ai_chat",
         durationMs: Date.now() - t0,
         outcome: "llm_error",
-        provider: deepseekKey ? "deepseek" : geminiKey ? "gemini" : undefined,
+        provider: pref ?? (deepseekKey ? "deepseek" : geminiKey ? "gemini" : undefined),
       });
       return NextResponse.json(bodyJson, { status });
     }

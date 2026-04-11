@@ -24,13 +24,13 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:3000** (or the URL printed in the terminal).
+Open **http://localhost:3000** (or the URL printed in the terminal). For another device on the same Wi‑Fi, use **`npm run dev:lan`** and the **Network** URL from the terminal (see `docs/agent/human-notes.md`).
 
-See **`docs/agent/human-notes.md`** for build, lint, and health checks.
+See **`docs/agent/human-notes.md`** for build, lint, health checks, and **deploying publicly** (e.g. Vercel with **Root Directory = `web`**).
 
 ## Environment
 
-Variable **names** only — see **`.env.example`** at the repo root. Never commit secrets.
+Variable **names** only — see **`.env.example`** at the repo root. Never commit secrets. Optional **shared access code** for a private deploy: `SCHOLARAI_ACCESS_CODE` + `ACCESS_GATE_SECRET`. Optional **LLM kill-switch**: `SCHOLARAI_LLM_DISABLED=true`. See **`docs/agent/human-notes.md`** (Administrator checklist + deploy).
 
 ## Contributing (people and assistants)
 

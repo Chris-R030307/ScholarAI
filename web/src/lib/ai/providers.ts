@@ -130,16 +130,62 @@ export async function callGeminiJson(params: {
   return { raw };
 }
 
+/** When set, only that provider is called (no cross-provider fallback). */
+export type PrimaryLlmPreference = "deepseek" | "gemini" | undefined;
+
 export async function callPrimaryLlmJson(params: {
   deepseekKey: string | undefined;
   geminiKey: string | undefined;
   system: string;
   user: string;
   signal: AbortSignal;
+  preference?: PrimaryLlmPreference;
 }): Promise<
   | { ok: true; raw: string; provider: "deepseek" | "gemini" }
   | { ok: false; error: string; status?: number }
 > {
+  const pref = params.preference;
+
+  if (pref === "deepseek") {
+    if (!params.deepseekKey) {
+      return {
+        ok: false,
+        error:
+          "DeepSeek is selected but DEEPSEEK_API_KEY is not set in web/.env.local.",
+      };
+    }
+    const r = await callDeepSeekJson({
+      apiKey: params.deepseekKey,
+      system: params.system,
+      user: params.user,
+      signal: params.signal,
+    });
+    if ("raw" in r) {
+      return { ok: true, raw: r.raw, provider: "deepseek" };
+    }
+    return { ok: false, error: r.error, status: r.status };
+  }
+
+  if (pref === "gemini") {
+    if (!params.geminiKey) {
+      return {
+        ok: false,
+        error:
+          "Gemini is selected but GEMINI_API_KEY is not set in web/.env.local.",
+      };
+    }
+    const g = await callGeminiJson({
+      apiKey: params.geminiKey,
+      system: params.system,
+      user: params.user,
+      signal: params.signal,
+    });
+    if ("raw" in g) {
+      return { ok: true, raw: g.raw, provider: "gemini" };
+    }
+    return { ok: false, error: g.error, status: g.status };
+  }
+
   if (params.deepseekKey) {
     const r = await callDeepSeekJson({
       apiKey: params.deepseekKey,

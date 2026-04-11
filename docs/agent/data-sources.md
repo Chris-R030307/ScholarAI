@@ -33,9 +33,9 @@ Env var **names** only; values live in `.env.local` or your secret store. See re
 | Item | Detail |
 |------|--------|
 | **URL** | `POST /api/ai/search-plan` (`web/src/app/api/ai/search-plan/route.ts`) |
-| **Body** | `{ "intent": string }` — natural-language research goal; bounded length (`AI_SEARCH_PLAN_MAX_INTENT_CHARS` in `constants.ts`). |
+| **Body** | `{ "intent": string, "providerPreference"?: "deepseek" \| "gemini" }` — natural-language research goal; bounded length (`AI_SEARCH_PLAN_MAX_INTENT_CHARS` in `constants.ts`). When `providerPreference` is set, the server uses **only** that provider (no Gemini fallback for a failed DeepSeek call, and vice versa). Omit it for **DeepSeek-first** with Gemini fallback if both keys exist (`web/src/lib/ai/providers.ts`). |
 | **Success JSON** | `{ "queries": string[], "filtersPatch": Partial<filter state>, "rationale"?: string, "provider": "deepseek" \| "gemini" }` — client merges `filtersPatch` into sidebar filters and runs Semantic Scholar for each query (first query drives pagination / load more). |
-| **Errors** | Same shape as other AI routes with `queries: []`, `filtersPatch: {}`, and `error`. Throttle channel `searchPlan` (10s per IP after success). |
+| **Errors** | Same shape as other AI routes with `queries: []`, `filtersPatch: {}`, and `error` (including `NO_PROVIDER`, `PROVIDER_UNAVAILABLE`, `RATE_LIMIT`, `LLM_ERROR`, `PARSE_ERROR`, `TIMEOUT`). Throttle channel `searchPlan` (10s per IP after success). |
 
 ## Internal AI route (Phase 3 — analyze, optional / not used by main UI in v1.1)
 
@@ -52,10 +52,17 @@ Env var **names** only; values live in `.env.local` or your secret store. See re
 | Item | Detail |
 |------|--------|
 | **URL** | `POST /api/ai/chat` (Next.js Route Handler: `web/src/app/api/ai/chat/route.ts`) |
-| **Body** | `{ "messages": [{ "role": "user" \| "assistant", "content": string }], "papers": [{ "id", "title", "abstract" }] }` — at most **80** papers, **24** turns; last message must be `user`. |
+| **Body** | `{ "messages": [...], "papers": [...], "providerPreference"?: "deepseek" \| "gemini" }` — at most **80** papers, **24** turns; last message must be `user`. Same `providerPreference` semantics as search-plan. |
 | **Success JSON** | `{ "reply": string (markdown), "citations": string[] (paper ids), "outOfCorpus": boolean, "provider"?: "deepseek" \| "gemini" }` |
-| **Errors** | `{ "error": { "code", "message" } }` with `400`, `429` (per-IP throttle, separate cooldown from analyze), `502`/`503`/`504` as appropriate. |
+| **Errors** | `{ "error": { "code", "message" } }` with `400`, `429` (per-IP throttle, separate cooldown from analyze), `502`/`503`/`504` as appropriate; `PROVIDER_UNAVAILABLE` when `providerPreference` does not match a configured key. |
 | **Retrieval** | Lexical scoring over in-memory chunks from titles/abstracts (`chunk-papers.ts`, `retrieve-chunks.ts`); no embedding API in v1. |
+
+## Internal route — site feature flags
+
+| Item | Detail |
+|------|--------|
+| **URL** | `GET /api/site-config` (`web/src/app/api/site-config/route.ts`) |
+| **JSON** | `{ "llmEnabled": boolean }` — `false` when **`SCHOLARAI_LLM_DISABLED`** is set on the server (administrator turned off all LLM use). No API keys returned. |
 
 ## Internal DTO
 

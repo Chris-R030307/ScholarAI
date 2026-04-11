@@ -10,7 +10,12 @@ import type { AiPaperInput } from "@/lib/ai/types";
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
 export type NormalizeChatResult =
-  | { ok: true; messages: ChatTurn[]; papers: AiPaperInput[] }
+  | {
+      ok: true;
+      messages: ChatTurn[];
+      papers: AiPaperInput[];
+      providerPreference?: "deepseek" | "gemini";
+    }
   | { ok: false; code: string; message: string };
 
 function trimAbstract(a: string | null): string | null {
@@ -151,5 +156,21 @@ export function normalizeChatBody(body: unknown): NormalizeChatResult {
     };
   }
 
-  return { ok: true, messages, papers };
+  const prefRaw = o.providerPreference;
+  let providerPreference: "deepseek" | "gemini" | undefined;
+  if (prefRaw !== undefined && prefRaw !== null) {
+    if (prefRaw !== "deepseek" && prefRaw !== "gemini") {
+      return {
+        ok: false,
+        code: "BAD_REQUEST",
+        message:
+          'Field providerPreference must be "deepseek" or "gemini" when provided.',
+      };
+    }
+    providerPreference = prefRaw;
+  }
+
+  return providerPreference
+    ? { ok: true, messages, papers, providerPreference }
+    : { ok: true, messages, papers };
 }

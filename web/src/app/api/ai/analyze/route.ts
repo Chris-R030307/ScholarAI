@@ -9,6 +9,7 @@ import {
   shouldThrottleClient,
 } from "@/lib/ai/rate-limit";
 import type { AiAnalyzeResponse } from "@/lib/ai/types";
+import { isLlmAdminDisabled } from "@/lib/llm-admin";
 
 export const runtime = "nodejs";
 
@@ -39,6 +40,25 @@ function logOutcome(params: {
 
 export async function POST(req: Request) {
   const t0 = Date.now();
+
+  if (isLlmAdminDisabled()) {
+    const bodyJson: AiAnalyzeResponse = {
+      rankings: [],
+      synthesis: "",
+      error: {
+        code: "LLM_DISABLED",
+        message:
+          "AI analyze is turned off on this server. The site owner can enable it in the host environment.",
+      },
+    };
+    logOutcome({
+      op: "ai_analyze",
+      durationMs: Date.now() - t0,
+      outcome: "client_error",
+    });
+    return NextResponse.json(bodyJson, { status: 503 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();

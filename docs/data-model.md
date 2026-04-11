@@ -94,6 +94,13 @@ Implementation: `web/src/lib/venue-kind.ts` (`classifyVenueKind`).
 | Storage | `sessionStorage` key `scholarai_corpus_cart` | JSON array of full `Paper` objects; invalid entries dropped on load. |
 | Wire to `/api/ai/chat` | `papers[]` | Same shape as before; max bounds in `constants.ts`. |
 
+### LLM provider preference (v1.3 / Phase 7)
+
+| Field | Type | Notes |
+|-------|------|--------|
+| Storage | `sessionStorage` key `scholarai_llm_provider` | `"deepseek"` \| `"gemini"`; drives the home page **LLM** control. |
+| Wire to `/api/ai/search-plan` and `/api/ai/chat` | `providerPreference` (optional) | When sent, server uses **only** that provider; omit for default DeepSeek-first + Gemini fallback when both env keys exist. |
+
 ## 6. Versioning
 
 When adding fields, update this table and **`docs/agent/pa.md`** / **`plan.md`** if behavior changes.

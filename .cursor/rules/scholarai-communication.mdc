@@ -22,13 +22,13 @@ These rules apply to **what you write in chat**. They do **not** relax **code, t
 
 - **Brief** summary: what changed (files or commands). If nothing changed, say "nothing changed"
 
+## User-reported bugs (unclear cause)
+
+When the user reports a problem and you **cannot** pin down a cause from the repo, logs, or a quick repro, you may ask for **focused** follow-up (steps, URL/host, device/browser, console or Network tab errors, terminal lines)—**only when needed**, not on every message.
+
 ## Questions without “please implement”
 
 - **Do not write code** unless the user asked you to; ask **one** clarifying question if the ask is ambiguous.
-
-## User-reported bugs (when cause is unclear)
-
-- You **may** ask the user for **targeted** extra information (repro steps, exact URL/host, browser/device, console or Network-tab errors, whether it works on `localhost` but not on a LAN URL). **Only when necessary** to narrow the failure — do not interrogate on every message.
 
 - **endings** end of every reply, append "Done"
 
