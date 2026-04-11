@@ -124,6 +124,15 @@ Yes — the app is a normal **Next.js** site in **`web/`**. The usual approach i
 
 Optional: **Settings → Domains** to attach your own domain.
 
+### If the live site shows `404 NOT_FOUND` (plain text) after setting Root Directory to `web`
+
+That response is **Vercel’s platform** (header `x-vercel-error: NOT_FOUND`), not the ScholarAI UI — usually the host did **not** treat the folder as a **Next.js** app.
+
+1. **Settings → General** → **Framework Preset** → set to **Next.js** (override “Other” if Vercel guessed wrong) → **Save**.
+2. **Settings → Build and Deployment** → **Root Directory** = **`web`** → **Save**. Clear **Output Directory** if anything custom is set (leave empty for Next).
+3. On **GitHub**, open the **same repo/branch** Vercel deploys and confirm **`web/package.json`** and **`web/src/app/page.tsx`** exist. If your Vercel project points at an **empty or old fork**, push your real code (this repo includes **`web/vercel.json`** to pin `nextjs` — commit and push it).
+4. **Deployments** → **⋯** on the latest deployment → **Redeploy** → enable **“Clear build cache”** if offered.
+
 ### Costs and responsibility
 
 - **Vercel:** has a **free tier** with fair-use limits; heavy traffic may need a paid plan — read [Vercel pricing](https://vercel.com/pricing).

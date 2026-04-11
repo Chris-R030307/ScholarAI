@@ -6,6 +6,11 @@ Short, **append-only** log: **newest first**. No secrets, tokens, or key materia
 
 ## 2026-04-11
 
+### 2026-04-11 — Vercel `404 NOT_FOUND` (plain text) after monorepo `web` root
+
+- **Symptom:** `*.vercel.app` returns **plain** `404 NOT_FOUND` / `x-vercel-error: NOT_FOUND` (not the Next.js app).
+- **Fix:** **Settings → General → Framework Preset = Next.js**; **Root Directory** `web`; empty **Output Directory**; confirm GitHub branch actually contains **`web/`**; **Redeploy** with cache clear. Repo adds **`web/vercel.json`** `{ "framework": "nextjs" }` so detection is explicit.
+
 ### 2026-04-11 — Administrator `SCHOLARAI_LLM_DISABLED` + `GET /api/site-config`
 
 - **`SCHOLARAI_LLM_DISABLED`** (truthy string) turns off **`/api/ai/*`** and hides AI UI; **Semantic Scholar** search unchanged. **`human-notes.md`** § Administrator checklist.
